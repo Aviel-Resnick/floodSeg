@@ -1,0 +1,8 @@
+--nChannel 100
+--maxIter 10
+--minLabels 5
+--lr 0.1
+--nConv 2
+--nSuperpixels 10000
+--compactness 100
+--visualize 1
