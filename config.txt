@@ -1,8 +1,9 @@
 --numChannels 100
---maxIter 5
+--maxIter 20
 --minLabels 3
 --lr 0.1
 --numConv 2
 --numSuperpixels 10000
 --compactness 100
 --visualize 1
+--sigma 1

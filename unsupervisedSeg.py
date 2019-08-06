@@ -29,6 +29,7 @@ parser.add_argument('--numConv', metavar='M', default=2, type=int, help='number 
 parser.add_argument('--numSuperpixels', metavar='K', default=10000, type=int, help='number of superpixels')
 parser.add_argument('--compactness', metavar='C', default=100, type=float, help='compactness of superpixels')
 parser.add_argument('--visualize', metavar='1 or 0', default=1, type=int, help='visualization flag')
+parser.add_argument('--sigma', metavar='S', default=0, type=float, help='gaussian smoothing')
 parser.add_argument('--input', metavar='FILENAME', help='input image file name', required=False)
 parser.add_argument('--file', type=open, action=LoadFromFile)
 args = parser.parse_args()
@@ -75,7 +76,7 @@ if cudaAvailable:
 data = Variable(data)
 
 # Segments image using k-means clustering in Color-(x,y,z) space.
-labels = segmentation.slic(image, compactness=args.compactness, n_segments=args.numSuperpixels)
+labels = segmentation.slic(image, compactness=args.compactness, sigma=args.sigma, n_segments=args.numSuperpixels)
 labels = labels.reshape(image.shape[0]*image.shape[1])
 uniqueLabels = np.unique(labels)
 l_inds = []
@@ -102,28 +103,28 @@ for batchIndex in range(args.maxIter):
     output = model(data)[0]
     output = output.permute(1, 2, 0).contiguous().view(-1, args.numChannels)
     _, target = torch.max(output, 1)
-    im_target = target.data.cpu().numpy()
-    nLabels = len(np.unique(im_target))
+    imTarget = target.data.cpu().numpy()
+    nLabels = len(np.unique(imTarget))
 
     # display image
     if args.visualize:
         # colors in segments
-        im_target_rgb = np.array([label_colours[c % 100] for c in im_target])
-        im_target_rgb = im_target_rgb.reshape(image.shape).astype(np.uint8)
-        cv2.imshow("Result", im_target_rgb)
+        imTargetRGB = np.array([label_colours[c % 100] for c in imTarget])
+        imTargetRGB = imTargetRGB.reshape(image.shape).astype(np.uint8)
+        cv2.imshow("Result", imTargetRGB)
         cv2.waitKey(10)
 
     # superpixel refinement
     # TODO: use Torch Variable instead of numpy for faster calculation
     for i in range(len(l_inds)):
-        labels_per_sp = im_target[l_inds[i]]
+        labels_per_sp = imTarget[l_inds[i]]
         u_labels_per_sp = np.unique(labels_per_sp)
         hist = np.zeros(len(u_labels_per_sp))
         for j in range(len(hist)):
             hist[j] = len(np.where(labels_per_sp == u_labels_per_sp[j])[0])
-        im_target[l_inds[i]] = u_labels_per_sp[np.argmax(hist)]
+        imTarget[l_inds[i]] = u_labels_per_sp[np.argmax(hist)]
     
-    target = torch.from_numpy(im_target)
+    target = torch.from_numpy(imTarget)
     if cudaAvailable:
         target = target.cuda()
 
@@ -144,10 +145,30 @@ if not args.visualize:
     output = model(data)[0]
     output = output.permute(1, 2, 0).contiguous().view(-1, args.numChannels)
     _, target = torch.max(output, 1)
-    im_target = target.data.cpu().numpy()
-    im_target_rgb = np.array([label_colours[c % 100] for c in im_target])
-    im_target_rgb = im_target_rgb.reshape(image.shape).astype(np.uint8)
+    imTarget = target.data.cpu().numpy()
+    imTargetRGB = np.array([label_colours[c % 100] for c in imTarget])
+    imTargetRGB = imTargetRGB.reshape(image.shape).astype(np.uint8)
     
 # save output image
 outputName = str(args.input).split('.')[0] + " Output.png"
-cv2.imwrite(outputName, im_target_rgb)
+cv2.imwrite(outputName, imTargetRGB)
+
+cannyIm = cv2.Canny(imTargetRGB, 200, 300)
+cannyTest = image.astype('uint8')
+
+cv2.imwrite("cannyOut.png", cannyIm)
+
+kernel = np.ones((5,5),np.uint8)
+opening = cv2.morphologyEx(cannyIm, cv2.MORPH_OPEN, kernel)
+
+_, contours, _ = cv2.findContours(opening, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+
+#closing = cv2.morphologyEx(img, cv2.MORPH_CLOSE, kernel)
+
+for contour in contours:
+    area = cv2.contourArea(contour)
+    if area > 50:
+        print("we have a", area, "contour")
+        cv2.drawContours(image, contour, -1, (0, 255, 0), 3)
+
+cv2.imwrite("Contoured.png", image)
