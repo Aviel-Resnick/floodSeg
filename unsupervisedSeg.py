@@ -188,7 +188,7 @@ cv2.destroyAllWindows()
 '''
 
 for i in labelColors:
-    layer = imTargetRGB
+    layer = imTargetRGB.reshape(image.shape).astype(np.uint8)
 
     lowerLim = np.array(i)
     upperLim = np.array(i)
@@ -199,12 +199,15 @@ for i in labelColors:
     for contour in contours:
         area = cv2.contourArea(contour)
         arc = cv2.arcLength(contour, False)
-        if arc > 0:
-            print("we have a", arc, "contour")
+        if area > 1000:
+            print("we have a", area, "contour")
             cv2.drawContours(layer, contour, -1, (0, 0, 255), 3)
 
-    cv2.imshow('layer', layer)
-    cv2.imwrite("Contoured", layer)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+    #cv2.imshow('layer', layer)
+    
+    outputName = ("Contour "+str(i)+" .png")
+    cv2.imwrite(outputName, layer)
+
+    #cv2.waitKey(0)
+    #cv2.destroyAllWindows()
 
