@@ -10,11 +10,12 @@ import sys
 import numpy as np
 from skimage import segmentation
 import torch.nn.init
+import random
 
 # TEMP: presegmented image
 
-preSeg = cv2.imread("blah.png")
-preSegGray = cv2.cvtColor(preSeg, cv2.COLOR_BGR2GRAY)
+#preSeg = cv2.imread("blah.png")
+#preSegGray = cv2.cvtColor(preSeg, cv2.COLOR_BGR2GRAY)
 
 cudaAvailable = torch.cuda.is_available()
 
@@ -39,7 +40,6 @@ parser.add_argument('--input', metavar='FILENAME', help='input image file name',
 parser.add_argument('--file', type=open, action=LoadFromFile)
 args = parser.parse_args()
 
-'''
 # CNN model
 class CNN(nn.Module):
     def __init__(self,input_dim):
@@ -99,8 +99,11 @@ lossFunction = torch.nn.CrossEntropyLoss()
 optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=0.9) # stochastic gradient descent 
 
 # generates a 100 x 3 list of integers up to 255 (100 different colors)
-label_colours = np.random.randint(255, size=(100,3))
-print(label_colours)
+# label_colours = np.random.randint(255, size=(100,3))
+
+labelColors = [[255,225,25],[0,130,200],[245,130,48],[250,190,190],[230,190,255],[128,0,0],[0,0,128],[128,128,128],[255,255,255],[0,0,0]]
+
+print(labelColors)
 
 # optimizes maxIter times
 for batchIndex in range(args.maxIter):
@@ -115,7 +118,7 @@ for batchIndex in range(args.maxIter):
     # display image
     if args.visualize:
         # colors in segments
-        imTargetRGB = np.array([label_colours[c % 100] for c in imTarget])
+        imTargetRGB = np.array([labelColors[c % 10] for c in imTarget])
         imTargetRGB = imTargetRGB.reshape(image.shape).astype(np.uint8)
         cv2.imshow("Result", imTargetRGB)
         cv2.waitKey(10)
@@ -152,12 +155,13 @@ if not args.visualize:
     output = output.permute(1, 2, 0).contiguous().view(-1, args.numChannels)
     _, target = torch.max(output, 1)
     imTarget = target.data.cpu().numpy()
-    imTargetRGB = np.array([label_colours[c % 100] for c in imTarget])
+    imTargetRGB = np.array([labelColors[c % 10] for c in imTarget])
     imTargetRGB = imTargetRGB.reshape(image.shape).astype(np.uint8)
     
 # save output image
 outputName = str(args.input).split('.')[0] + " Output.png"
 cv2.imwrite(outputName, imTargetRGB)
+
 
 '''
 blur = cv2.GaussianBlur(preSeg,(5,5),0)
@@ -180,3 +184,27 @@ for contour in contours:
 cv2.imshow('img', preSeg)
 cv2.waitKey(0)
 cv2.destroyAllWindows()
+
+'''
+
+for i in labelColors:
+    layer = imTargetRGB
+
+    lowerLim = np.array(i)
+    upperLim = np.array(i)
+
+    mask = cv2.inRange(layer, lowerLim, upperLim)
+    returned, contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+
+    for contour in contours:
+        area = cv2.contourArea(contour)
+        arc = cv2.arcLength(contour, False)
+        if arc > 0:
+            print("we have a", arc, "contour")
+            cv2.drawContours(layer, contour, -1, (0, 0, 255), 3)
+
+    cv2.imshow('layer', layer)
+    cv2.imwrite("Contoured", layer)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+
