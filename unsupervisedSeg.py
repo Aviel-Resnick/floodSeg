@@ -11,6 +11,11 @@ import numpy as np
 from skimage import segmentation
 import torch.nn.init
 
+# TEMP: presegmented image
+
+preSeg = cv2.imread("blah.png")
+preSegGray = cv2.cvtColor(preSeg, cv2.COLOR_BGR2GRAY)
+
 cudaAvailable = torch.cuda.is_available()
 
 # class to pull configuration arguments from a seperate file
@@ -34,6 +39,7 @@ parser.add_argument('--input', metavar='FILENAME', help='input image file name',
 parser.add_argument('--file', type=open, action=LoadFromFile)
 args = parser.parse_args()
 
+'''
 # CNN model
 class CNN(nn.Module):
     def __init__(self,input_dim):
@@ -153,22 +159,24 @@ if not args.visualize:
 outputName = str(args.input).split('.')[0] + " Output.png"
 cv2.imwrite(outputName, imTargetRGB)
 
-cannyIm = cv2.Canny(imTargetRGB, 200, 300)
-cannyTest = image.astype('uint8')
+'''
+blur = cv2.GaussianBlur(preSeg,(5,5),0)
+cannyIm = cv2.Canny(blur, 200, 300)
+cannyTest = cannyIm.astype('uint8')
 
 cv2.imwrite("cannyOut.png", cannyIm)
 
-kernel = np.ones((5,5),np.uint8)
-opening = cv2.morphologyEx(cannyIm, cv2.MORPH_OPEN, kernel)
+kernel = np.ones((2,2),np.uint8)
 
-_, contours, _ = cv2.findContours(opening, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-
-#closing = cv2.morphologyEx(img, cv2.MORPH_CLOSE, kernel)
+_, contours, hierarchy = cv2.findContours(cannyIm,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
 
 for contour in contours:
     area = cv2.contourArea(contour)
-    if area > 50:
-        print("we have a", area, "contour")
-        cv2.drawContours(image, contour, -1, (0, 255, 0), 3)
+    arc = cv2.arcLength(contour, False)
+    if arc > 20:
+        print("we have a", arc, "contour")
+        cv2.drawContours(preSeg, contour, -1, (0,255,0), 3)
 
-cv2.imwrite("Contoured.png", image)
+cv2.imshow('img', preSeg)
+cv2.waitKey(0)
+cv2.destroyAllWindows()
