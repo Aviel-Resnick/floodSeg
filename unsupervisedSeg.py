@@ -12,9 +12,16 @@ from skimage import segmentation
 import torch.nn.init
 import random
 
+#ogImage = cv2.imread("184-6.jpg")
+#segmented = cv2.imread("184-6 Output.png")
+#labelColors = [[255,225,25],[0,130,200],[245,130,48],[250,190,190],[230,190,255],[128,0,0],[0,0,128],[128,128,128],[255,255,255],[0,0,0]]
+
 # TEMP: presegmented image
 
-#preSeg = cv2.imread("blah.png")
+#imTargetRGB = cv2.imread("blah.png")
+#image = cv2.imread("175-4.jpg")
+#labelColors = [[255,225,25],[0,130,200],[245,130,48],[250,190,190],[230,190,255],[128,0,0],[0,0,128],[128,128,128],[255,255,255],[0,0,0]]
+
 #preSegGray = cv2.cvtColor(preSeg, cv2.COLOR_BGR2GRAY)
 
 cudaAvailable = torch.cuda.is_available()
@@ -162,52 +169,36 @@ if not args.visualize:
 outputName = str(args.input).split('.')[0] + " Output.png"
 cv2.imwrite(outputName, imTargetRGB)
 
-
-'''
-blur = cv2.GaussianBlur(preSeg,(5,5),0)
-cannyIm = cv2.Canny(blur, 200, 300)
-cannyTest = cannyIm.astype('uint8')
-
-cv2.imwrite("cannyOut.png", cannyIm)
-
-kernel = np.ones((2,2),np.uint8)
-
-_, contours, hierarchy = cv2.findContours(cannyIm,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
-
-for contour in contours:
-    area = cv2.contourArea(contour)
-    arc = cv2.arcLength(contour, False)
-    if arc > 20:
-        print("we have a", arc, "contour")
-        cv2.drawContours(preSeg, contour, -1, (0,255,0), 3)
-
-cv2.imshow('img', preSeg)
-cv2.waitKey(0)
-cv2.destroyAllWindows()
-
-'''
+def display(windowName, window, notableContours):
+    for contour in notableContours:
+        cv2.drawContours(window, contour, -1, (0, 0, 255), 3)
+    
+    cv2.imshow(windowName, window)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
 
 for i in labelColors:
-    layer = imTargetRGB.reshape(image.shape).astype(np.uint8)
+    imageContoured = image.copy()
+    notableContours = []
 
     lowerLim = np.array(i)
     upperLim = np.array(i)
 
-    mask = cv2.inRange(layer, lowerLim, upperLim)
+    mask = cv2.inRange(imTargetRGB, lowerLim, upperLim)
     returned, contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+
+    colorExists = False
 
     for contour in contours:
         area = cv2.contourArea(contour)
         arc = cv2.arcLength(contour, False)
-        if area > 1000:
+        if area > 5000:
             print("we have a", area, "contour")
-            cv2.drawContours(layer, contour, -1, (0, 0, 255), 3)
+            notableContours.append(contour)
+            colorExists = True
 
-    #cv2.imshow('layer', layer)
-    
     outputName = ("Contour "+str(i)+" .png")
-    cv2.imwrite(outputName, layer)
-
-    #cv2.waitKey(0)
-    #cv2.destroyAllWindows()
+    
+    if colorExists:
+        display(outputName, imageContoured, notableContours)
 
