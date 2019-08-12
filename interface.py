@@ -3,19 +3,9 @@ import tkinter.filedialog
 from PIL import ImageTk, Image
 from tkinter import Tk, Text, BOTH, W, N, E, S
 from tkinter.ttk import Frame, Button, Label, Style
-
-
-class Tuning(Frame):
-    def __init__(self):
-        super().__init__()
-        self.initUI()
-
-    def modifyConfig(self):
-        print("modifying config")
-
-    def initUI(self):
-        self.master.title("Segmentation")
-        self.modifyConfig()
+import os.path
+from os import path
+import webbrowser
 
 class Segmentation(Frame):
     def __init__(self):
@@ -36,10 +26,11 @@ class Segmentation(Frame):
         panel.grid(row=1, column=0, columnspan=2, rowspan=5, padx=5, sticky=E+W+S+N)
 
     def tune(self):
-        root = Tk()
-        root.geometry("250x500")
-        app = Tuning()
-        root.mainloop()
+        if path.exists("config.txt"):
+            webbrowser.open("config.txt")
+
+        else:
+            print("we don't have a config file")
 
     def initUI(self):
         self.master.title("Segmentation")
