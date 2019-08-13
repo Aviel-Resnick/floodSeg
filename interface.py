@@ -23,12 +23,12 @@ class Segmentation(Frame):
         photoImg = ImageTk.PhotoImage(img)
         width, height = img.size
         resX = width + 150
-        resY = height + 10
+        resY = height + 20
         self.master.geometry(str(resX)+"x"+str(resY))
 
         panel = tk.Label(self, image = photoImg)
         panel.image = photoImg
-        panel.grid(row=1, column=0, columnspan=2, rowspan=5, padx=5, sticky=E+W+S+N)
+        panel.grid(row=1, column=0, columnspan=2, rowspan=6, padx=5, sticky=E+W+S+N)
 
     def tune(self):
         global configFile
@@ -61,26 +61,29 @@ class Segmentation(Frame):
         
         panel = tk.Label(self, text = "Image will appear here.", bg="white")
         #panel.image = photoImg
-        panel.grid(row=1, column=0, columnspan=2, rowspan=5, padx=10, pady=10, sticky=E+W+S+N)
+        panel.grid(row=1, column=0, columnspan=2, rowspan=6, padx=10, pady=10, sticky=E+W+S+N)
 
         btnSelect = Button(self, text="Select an Image", command = self.selectImage)
         btnSelect.grid(row=1, column=3, padx=10, pady=20)
 
+        btnAdjust = Button(self, text="Image Adjustments", command = self.selectImage)
+        btnAdjust.grid(row=2, column=3, padx=10, pady=20)
+
         btnTune = Button(self, text="Manual Tuning", command = self.tune)
-        btnTune.grid(row=2, column=3, padx=10, pady=20)
+        btnTune.grid(row=3, column=3, padx=10, pady=20)
 
         btnCalibrate = Button(self, text="Calibration", command = self.calibration)
-        btnCalibrate.grid(row=3, column=3, padx=10, pady=20)
+        btnCalibrate.grid(row=4, column=3, padx=10, pady=20)
 
         btnSegment = Button(self, text="Train & Segment", command = self.segment)
-        btnSegment.grid(row=4, column=3, padx=10, pady=20)
+        btnSegment.grid(row=5, column=3, padx=10, pady=20)
 
         btnPartition = Button(self, text="Assign Partitions")
-        btnPartition.grid(row=5, column=3, padx=10, pady=20)
+        btnPartition.grid(row=6, column=3, padx=10, pady=20)
 
 def main():
     root = Tk()
-    root.geometry("350x320")
+    root.geometry("350x390")
     app = Segmentation()
     root.mainloop()
 
