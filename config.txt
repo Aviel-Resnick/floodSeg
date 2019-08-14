@@ -1,4 +1,4 @@
---numChannels 50
+--numChannels 100
 --maxIter 2
 --minLabels 3
 --lr 0.1
