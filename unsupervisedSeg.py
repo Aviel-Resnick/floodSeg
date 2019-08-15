@@ -87,7 +87,9 @@ def main(inputImage, configFile):
 
     args = parser.parse_args()
     # load image
-    image = cv2.imread(inputImage)
+    #image = cv2.imread(inputImage)
+
+    image = inputImage
 
     # scale images back down (divide by 255)
     # changes format from NHWC --> NCWH 
