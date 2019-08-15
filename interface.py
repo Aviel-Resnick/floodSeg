@@ -11,6 +11,19 @@ import unsupervisedSeg
 pathToImg = None
 configFile = None
 
+# Known bugs:
+#   Duplicate Colors
+#   Not parsing args from file
+#   Window scales up but not down
+
+# To Do:
+#   Implement image adjustment
+#   Comment sections
+#   Design and implement component identification
+#   Area to Metric conversion
+#   Output data to xls
+#   Improve parameters
+
 class Segmentation(Frame):
     def __init__(self):
         super().__init__()
@@ -22,14 +35,17 @@ class Segmentation(Frame):
         img = Image.open(pathToImg)
         photoImg = ImageTk.PhotoImage(img)
         width, height = img.size
-        resX = width + 150
-        resY = height + 20
-        self.master.geometry(str(resX)+"x"+str(resY))
-
+        resX = width + 150 if width + 150 > 350 else 350
+        resY = height + 20 if height + 20 > 390 else 390
+        
+        #self.master.geometry(str(resX)+"x"+str(resY))
+        
         panel = tk.Label(self, image = photoImg)
         panel.image = photoImg
         panel.grid(row=1, column=0, columnspan=2, rowspan=6, padx=5, sticky=E+W+S+N)
-
+        
+        self.master.geometry("")
+        
     def tune(self):
         global configFile
         configFile = "config.txt" # default path
@@ -83,7 +99,8 @@ class Segmentation(Frame):
 
 def main():
     root = Tk()
-    root.geometry("350x390")
+    #root.geometry("350x390")
+    root.geometry("")
     app = Segmentation()
     root.mainloop()
 

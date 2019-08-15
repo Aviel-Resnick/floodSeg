@@ -72,16 +72,17 @@ def main(inputImage, configFile):
 
     # parser setup
     parser = argparse.ArgumentParser(description='Unsupervised Arterial Segmentation ')
-    parser.add_argument('--numChannels', metavar='N', default=100, type=int, help='number of channels')
+    parser.add_argument('--numChannels', metavar='N', default=120, type=int, help='number of channels')
     parser.add_argument('--maxIter', metavar='T', default=10, type=int, help='number of maximum iterations')
-    parser.add_argument('--minLabels', metavar='minL', default=5, type=int, help='minimum number of labels')
+    parser.add_argument('--minLabels', metavar='minL', default=2, type=int, help='minimum number of labels')
     parser.add_argument('--lr', metavar='LR', default=0.1, type=float, help='learning rate')
     parser.add_argument('--numConv', metavar='M', default=2, type=int, help='number of convolutional layers')
-    parser.add_argument('--numSuperpixels', metavar='K', default=10000, type=int, help='number of superpixels')
+    parser.add_argument('--numSuperpixels', metavar='K', default=5000, type=int, help='number of superpixels')
     parser.add_argument('--compactness', metavar='C', default=100, type=float, help='compactness of superpixels')
     parser.add_argument('--visualize', metavar='1 or 0', default=1, type=int, help='visualization flag')
-    parser.add_argument('--sigma', metavar='S', default=0, type=float, help='gaussian smoothing')
+    parser.add_argument('--sigma', metavar='S', default=10, type=float, help='gaussian smoothing')
     parser.add_argument('--input', metavar='FILENAME', help='input image file name', required=False)
+    parser.add_argument('--minContour', metavar='minC', default=1000, type=int, help='Minimum size for a "notable" contour')
     parser.add_argument('--file', type=open, action=LoadFromFile)
 
     args = parser.parse_args()
@@ -189,14 +190,14 @@ def main(inputImage, configFile):
         upperLim = np.array(i)
     
         mask = cv2.inRange(imTargetRGB, lowerLim, upperLim)
-        returned, contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+        returned, contours, hierarchy = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
     
         colorExists = False
     
         for contour in contours:
             area = cv2.contourArea(contour)
             arc = cv2.arcLength(contour, False)
-            if area > 5000:
+            if area > args.minContour:
                 print("we have a", area, "contour")
                 notableContours.append(contour)
                 colorExists = True
@@ -205,6 +206,7 @@ def main(inputImage, configFile):
         
         if colorExists:
             display(outputName, imageContoured, notableContours)
+            print(hierarchy)
 
 if __name__ == '__main__':
     main()
