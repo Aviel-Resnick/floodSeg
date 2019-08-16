@@ -24,17 +24,14 @@ configFile = None
 Known bugs:
     Duplicate Colors
     Not parsing args from file
-    indow scales up but not down
+    Window scales up but not down
 
 To Do:
-    Render contours on resized image (if applicable)
-        Currently using original *HUGE* image
     Comment sections
     Design and implement component identification
     Area to Metric conversion
     Output data to xls
     Improve parameters
-    Auto resize images which are too large
     Find alternative to globals in interface
         Lambda is the answer
 
@@ -68,6 +65,10 @@ class Segmentation(Frame):
             hsize = int((float(img.size[1])*float(wpercent)))
             img = img.resize((basewidth,hsize), Image.ANTIALIAS)
             photoImg = ImageTk.PhotoImage(img)
+            
+            resizedImagePath = pathToImg.split('.')[0] + " Resized.png"
+            img.save(resizedImagePath)
+            pathToImg = resizedImagePath
 
         self.updateImage(photoImg)
         
@@ -167,7 +168,8 @@ class Segmentation(Frame):
     def segment(self):
         global pathToImg, newImagePath
 
-        if type(newImagePath) == None:
+        if newImagePath is None:
+            print("dsfs")
             newImagePath = pathToImg
         #inputFile = pathToImg
         #print(inputFile)

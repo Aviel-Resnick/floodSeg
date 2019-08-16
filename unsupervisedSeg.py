@@ -11,7 +11,6 @@ import numpy as np
 from skimage import segmentation
 import torch.nn.init
 import random
-
 args = 0
 
 #ogImage = cv2.imread("184-6.jpg")
@@ -60,7 +59,7 @@ class CNN(nn.Module):
 
 def display(windowName, window, notableContours):
     for contour in notableContours:
-        cv2.drawContours(window, contour, -1, (0, 0, 255), 3)
+        cv2.drawContours(window, contour, -1, (0, 0, 255), 2)
     
     cv2.imshow(windowName, window)
     cv2.waitKey(0)
@@ -72,7 +71,7 @@ def main(inputImagePath, originalImagePath, configFile):
 
     # parser setup
     parser = argparse.ArgumentParser(description='Unsupervised Arterial Segmentation ')
-    parser.add_argument('--numChannels', metavar='N', default=80, type=int, help='number of channels')
+    parser.add_argument('--numChannels', metavar='N', default=100, type=int, help='number of channels')
     parser.add_argument('--maxIter', metavar='T', default=10, type=int, help='number of maximum iterations')
     parser.add_argument('--minLabels', metavar='minL', default=2, type=int, help='minimum number of labels')
     parser.add_argument('--lr', metavar='LR', default=0.1, type=float, help='learning rate')
@@ -80,7 +79,7 @@ def main(inputImagePath, originalImagePath, configFile):
     parser.add_argument('--numSuperpixels', metavar='K', default=10000, type=int, help='number of superpixels')
     parser.add_argument('--compactness', metavar='C', default=100, type=float, help='compactness of superpixels')
     parser.add_argument('--visualize', metavar='1 or 0', default=1, type=int, help='visualization flag')
-    parser.add_argument('--sigma', metavar='S', default=10, type=float, help='gaussian smoothing')
+    parser.add_argument('--sigma', metavar='S', default=0, type=float, help='gaussian smoothing')
     parser.add_argument('--input', metavar='FILENAME', help='input image file name', required=False)
     parser.add_argument('--minContour', metavar='minC', default=1000, type=int, help='Minimum size for a "notable" contour')
     parser.add_argument('--file', type=open, action=LoadFromFile)
@@ -124,7 +123,8 @@ def main(inputImagePath, originalImagePath, configFile):
     # generates a 100 x 3 list of integers up to 255 (100 different colors)
     # label_colours = np.random.randint(255, size=(100,3))
 
-    labelColors = [[255,225,25],[0,130,200],[245,130,48],[250,190,190],[230,190,255],[128,0,0],[0,0,128],[128,128,128],[255,255,255],[0,0,0]]
+    labelColors = np.random.randint(255, size=(100,3))
+    #labelColors = [[255, 255, 255],[230, 230, 230],[199, 199, 199],[171, 171, 171],[130, 130, 130],[97, 97, 97],[69, 69, 69],[117, 0, 0],[255, 0, 0],[0,0,0]]
 
     print(labelColors)
 
@@ -141,7 +141,7 @@ def main(inputImagePath, originalImagePath, configFile):
         # display image
         if args.visualize:
             # colors in segments
-            imTargetRGB = np.array([labelColors[c % 10] for c in imTarget])
+            imTargetRGB = np.array([labelColors[c % 100] for c in imTarget])
             imTargetRGB = imTargetRGB.reshape(image.shape).astype(np.uint8)
             cv2.imshow("Result", imTargetRGB)
             cv2.waitKey(10)
@@ -201,7 +201,6 @@ def main(inputImagePath, originalImagePath, configFile):
             area = cv2.contourArea(contour)
             arc = cv2.arcLength(contour, False)
             if area > args.minContour:
-                print("we have a", area, "contour")
                 notableContours.append(contour)
                 colorExists = True
     
@@ -213,4 +212,3 @@ def main(inputImagePath, originalImagePath, configFile):
 
 if __name__ == '__main__':
     main()
-
