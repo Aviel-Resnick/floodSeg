@@ -1,3 +1,8 @@
+'''
+Aviel Resnick, 2019
+Utility designed for the automated segmentation of images, particulary stented coronary arteries.
+'''
+
 import tkinter as tk
 import tkinter.filedialog
 import tkinter.simpledialog
@@ -9,29 +14,34 @@ from os import path
 import webbrowser
 import unsupervisedSeg
 
+img = None # original
 pathToImg = None
-img = None
+currentImage = None
+newImagePath = None
 configFile = None
 
-# Known bugs:
-#   Duplicate Colors
-#   Not parsing args from file
-#   Window scales up but not down
+'''
+Known bugs:
+    Duplicate Colors
+    Not parsing args from file
+    indow scales up but not down
 
-# To Do:
-#   Save modified image and pass path to unsupervised seg
-#   Comment sections
-#   Design and implement component identification
-#   Area to Metric conversion
-#   Output data to xls
-#   Improve parameters
-#   Auto resize images which are too large
-#   Find alternative to globals in interface
-#       Lambda is the answer
+To Do:
+    Render contours on resized image (if applicable)
+        Currently using original *HUGE* image
+    Comment sections
+    Design and implement component identification
+    Area to Metric conversion
+    Output data to xls
+    Improve parameters
+    Auto resize images which are too large
+    Find alternative to globals in interface
+        Lambda is the answer
 
-# Notes:
-#   Stents often included in neointima component
-#       Maybe identify those independently and subtract
+Notes:
+    Stents often included in neointima component
+        Maybe identify those independently and subtract
+'''
 
 class Segmentation(Frame):
     def __init__(self):
@@ -43,18 +53,32 @@ class Segmentation(Frame):
         pathToImg = tkinter.filedialog.askopenfilename(filetypes=[("Image File",'.jpg')])
         img = Image.open(pathToImg)
         photoImg = ImageTk.PhotoImage(img)
+
         width, height = img.size
+        
+        '''
         resX = width + 150 if width + 150 > 350 else 350
         resY = height + 20 if height + 20 > 390 else 390
-        
         #self.master.geometry(str(resX)+"x"+str(resY))
+        '''
+
+        if width > 800 or height > 800:
+            basewidth = 600
+            wpercent = (basewidth/float(img.size[0]))
+            hsize = int((float(img.size[1])*float(wpercent)))
+            img = img.resize((basewidth,hsize), Image.ANTIALIAS)
+            photoImg = ImageTk.PhotoImage(img)
+
         self.updateImage(photoImg)
         
         self.master.geometry("")
 
     def updateImage(self, image):
+        global currentImage
+
         panel = tk.Label(self, image = image)
         panel.image = image
+        currentImage = image
         panel.grid(row=1, column=0, columnspan=2, rowspan=6, padx=5, sticky=E+W+S+N)
     
     def chooseAdjust(self):
@@ -75,7 +99,7 @@ class Segmentation(Frame):
         labelContrast = tk.Label(popup, text="Contrast:", font=("Helvetica 12 bold"))
         labelContrast.grid(row=3, column=0, padx=5, pady=16, sticky=E+W+S+N)
 
-        slideContrast = tk.Scale(popup, orient='horizontal', from_=0, to=10)
+        slideContrast = tk.Scale(popup, orient='horizontal', from_=0.0, to=10.0, digits = 3, resolution = 0.1)
         slideContrast.set(1)
         slideContrast.grid(row=3, column=1, padx=10, pady=0, sticky=E+W+S+N)
 
@@ -85,14 +109,14 @@ class Segmentation(Frame):
         labelBrightness = tk.Label(popup, text="Brightness:", font=("Helvetica 12 bold"))
         labelBrightness.grid(row=5, column=0, padx=5, pady=16, sticky=E+W+S+N)
 
-        slideBrightness = tk.Scale(popup, orient='horizontal', from_=0, to=10)
+        slideBrightness = tk.Scale(popup, orient='horizontal', from_=0.0, to=10.0, digits = 3, resolution = 0.1)
         slideBrightness.set(1)
         slideBrightness.grid(row=5, column=1, padx=10, pady=0, sticky=E+W+S+N)
 
         labelBrightnessInfo = tk.Label(popup, text="0 = Black, 1 = Original, n > 1 = Brightness Factor")
         labelBrightnessInfo.grid(row=6, column=1, padx=10, pady=0, sticky=E+W+S+N)
 
-        restore = tk.Button(popup, text="Restore to Original", command = lambda:[self.adjust(1, 1, 1), popup.destroy()])
+        restore = tk.Button(popup, text="Restore to Original", command = lambda:[self.adjust(-1, -1, -1), popup.destroy()])
         restore.grid(row=7, column=0, padx=10, pady=10, sticky=E+W+S+N)
 
         submit = tk.Button(popup, text="Confirm Adjustments", command = lambda:[self.adjust(slideSharpness.get(), slideContrast.get(), slideBrightness.get()), popup.destroy()])
@@ -101,7 +125,7 @@ class Segmentation(Frame):
         popup.mainloop()
 
     def adjust(self, sharp, contrast, bright):
-        global img
+        global img, pathToImg, newImagePath
 
         enhancer = ImageEnhance.Sharpness(img)
         newImage = enhancer.enhance(sharp)
@@ -112,11 +136,17 @@ class Segmentation(Frame):
         enhancer = ImageEnhance.Brightness(newImage)
         newImage = enhancer.enhance(bright)
         
-        img = newImage
+        #img = newImage
 
         # sharpness, contrast, brightness
         print("adjusting by ", sharp, contrast, bright)
         self.updateImage(ImageTk.PhotoImage(newImage))
+
+        newImagePath = pathToImg.split('.')[0] + " Modified.png"
+        newImage.save(newImagePath)
+
+        if sharp == -1 and contrast == -1 and bright == -1:
+            self.updateImage(ImageTk.PhotoImage(img))
 
 
     def tune(self):
@@ -135,10 +165,13 @@ class Segmentation(Frame):
         print(inputDialog)
      
     def segment(self):
-        global img
+        global pathToImg, newImagePath
+
+        if type(newImagePath) == None:
+            newImagePath = pathToImg
         #inputFile = pathToImg
         #print(inputFile)
-        unsupervisedSeg.main(img, configFile)
+        unsupervisedSeg.main(newImagePath, pathToImg, configFile)
 
     def initUI(self):
         self.master.title("Segmentation")

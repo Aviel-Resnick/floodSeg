@@ -66,18 +66,18 @@ def display(windowName, window, notableContours):
     cv2.waitKey(0)
     cv2.destroyAllWindows()
 
-def main(inputImage, configFile):
+def main(inputImagePath, originalImagePath, configFile):
     global args
     cudaAvailable = torch.cuda.is_available()
 
     # parser setup
     parser = argparse.ArgumentParser(description='Unsupervised Arterial Segmentation ')
-    parser.add_argument('--numChannels', metavar='N', default=120, type=int, help='number of channels')
+    parser.add_argument('--numChannels', metavar='N', default=80, type=int, help='number of channels')
     parser.add_argument('--maxIter', metavar='T', default=10, type=int, help='number of maximum iterations')
     parser.add_argument('--minLabels', metavar='minL', default=2, type=int, help='minimum number of labels')
     parser.add_argument('--lr', metavar='LR', default=0.1, type=float, help='learning rate')
     parser.add_argument('--numConv', metavar='M', default=2, type=int, help='number of convolutional layers')
-    parser.add_argument('--numSuperpixels', metavar='K', default=5000, type=int, help='number of superpixels')
+    parser.add_argument('--numSuperpixels', metavar='K', default=10000, type=int, help='number of superpixels')
     parser.add_argument('--compactness', metavar='C', default=100, type=float, help='compactness of superpixels')
     parser.add_argument('--visualize', metavar='1 or 0', default=1, type=int, help='visualization flag')
     parser.add_argument('--sigma', metavar='S', default=10, type=float, help='gaussian smoothing')
@@ -89,7 +89,8 @@ def main(inputImage, configFile):
     # load image
     #image = cv2.imread(inputImage)
 
-    image = inputImage
+    image = cv2.imread(inputImagePath)
+    originalImage = cv2.imread(originalImagePath)
 
     # scale images back down (divide by 255)
     # changes format from NHWC --> NCWH 
@@ -181,11 +182,11 @@ def main(inputImage, configFile):
         imTargetRGB = imTargetRGB.reshape(image.shape).astype(np.uint8)
         
     # save output image
-    outputName = str(inputImage).split('.')[0] + " Output.png"
+    outputName = str(originalImagePath).split('.')[0] + " Output.png"
     cv2.imwrite(outputName, imTargetRGB)
 
     for i in labelColors:
-        imageContoured = image.copy()
+        imageContoured = originalImage.copy()
         notableContours = []
     
         lowerLim = np.array(i)
