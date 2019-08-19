@@ -6,6 +6,7 @@ Utility designed for the automated segmentation of images, particulary stented c
 import tkinter as tk
 import tkinter.filedialog
 import tkinter.simpledialog
+from tkinter import ttk
 from PIL import ImageTk, Image, ImageEnhance
 from tkinter import Tk, Text, BOTH, W, N, E, S
 from tkinter.ttk import Frame, Button, Label, Style
@@ -19,18 +20,20 @@ pathToImg = None
 currentImage = None
 newImagePath = None
 configFile = None
+componentList = [["EEL", "Empty", None],["IEL", "Empty", None], ["Neointima", "Empty", None], ["Lumen", "Empty", None]]
 
 '''
 Known bugs:
     Duplicate Colors
     Not parsing args from file
-    Window scales up but not down
+    Since I am not removing the "deleted" item from componentList, its returns at the next refresh
 
 To Do:
+    Finish data extraction section
+    Minor adjustments & full manual
     Comment sections
     Design and implement component identification
     Area to Metric conversion
-    Output data to xls
     Improve parameters
     Find alternative to globals in interface
         Lambda is the answer
@@ -175,6 +178,66 @@ class Segmentation(Frame):
         #print(inputFile)
         unsupervisedSeg.main(newImagePath, pathToImg, configFile)
 
+    def refreshTree(self, tree):
+        global componentList
+
+        tree.delete(*tree.get_children()) # kill all the children
+        for i in range(0, len(componentList)):
+            tree.insert("", i, text=componentList[i][0], values=componentList[i][1])
+
+    def addComponent(self):
+        global componentList
+        inputDialog = tkinter.simpledialog.askstring("Add new component", "Component Name:")
+        
+        component = [inputDialog, "Empty", None]
+        componentList.append(component)
+
+    def removeComponent(self, tree):
+        global componentList
+        component = tree.selection()[0]
+        print(component)
+        tree.delete(component)
+
+        #componentList.pop(int(component[-1])-1)
+        #self.refreshTree(tree)
+
+    def dataExtraction(self):
+        self.pack(fill=BOTH, expand=True)
+        popup = tk.Tk()
+        popup.wm_title("Data Extraction")
+
+        tree=ttk.Treeview(popup)
+        tree.grid(row=0, column=0, columnspan=3, rowspan=3, padx=10, pady=10, sticky=E+W+S+N)
+
+        tree["columns"]=("one")
+        tree.column("#0", width=270, minwidth=270, stretch=tk.NO)
+        tree.column("one", width=150, minwidth=150, stretch=tk.NO)
+
+        tree.heading("#0",text="Component",anchor=tk.W)
+        tree.heading("one", text="Status",anchor=tk.W)
+
+        self.refreshTree(tree)
+
+        add = tk.Button(popup, text="Add", command = lambda:[self.addComponent(), self.refreshTree(tree)])
+        add.grid(row=3, column=0, padx=10, pady=10, sticky=E+W+S+N)
+
+        edit = tk.Button(popup, text="Edit", command = lambda:[popup.destroy()])
+        edit.grid(row=3, column=1, padx=10, pady=10, sticky=E+W+S+N)
+
+        delete = tk.Button(popup, text="Remove", command = lambda:[self.removeComponent(tree)])
+        delete.grid(row=3, column=2, padx=10, pady=10, sticky=E+W+S+N)
+
+        exportLabel = tk.Label(popup, text="Export ", font=("Helvetica 12 bold"))
+        exportLabel.grid(row=0, column = 3, padx=20, pady=10, sticky=E+W+S+N)
+
+        text = tk.Button(popup, text=".txt", command = lambda:[popup.destroy()])
+        text.grid(row=1, column=3, padx=10, pady=10, sticky=E+W+S+N)
+
+        excel = tk.Button(popup, text=".xls", command = lambda:[popup.destroy()])
+        excel.grid(row=2, column=3, padx=10, pady=10, sticky=E+W+S+N)
+        
+        popup.mainloop()
+
     def initUI(self):
         self.master.title("Segmentation")
         self.pack(fill=BOTH, expand=True)
@@ -203,7 +266,7 @@ class Segmentation(Frame):
         btnSegment = Button(self, text="Train & Segment", command = self.segment)
         btnSegment.grid(row=5, column=3, padx=10, pady=20, sticky=E+W+S+N)
 
-        btnPartition = Button(self, text="Assign Partitions")
+        btnPartition = Button(self, text="Data Extraction", command = self.dataExtraction)
         btnPartition.grid(row=6, column=3, padx=10, pady=20, sticky=E+W+S+N)
 
 def main():

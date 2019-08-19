@@ -68,6 +68,25 @@ def display(windowName, window, notableContours):
 def main(inputImagePath, originalImagePath, configFile):
     global args
     cudaAvailable = torch.cuda.is_available()
+    configList = []
+
+    '''
+    Config Structure
+    0--numChannels 100
+    1--maxIter 10
+    2--minLabels 2
+    3--lr 0.1
+    4--numConv 2
+    5--numSuperpixels 10000
+    6--compactness 100
+    7--visualize 1
+    8--sigma 0
+    9--minContour 1000
+    '''
+
+    with open('config.txt') as config:
+        for line in config:
+            configList.append(line.split(" ")[1])
 
     # parser setup
     parser = argparse.ArgumentParser(description='Unsupervised Arterial Segmentation ')
@@ -104,7 +123,7 @@ def main(inputImagePath, originalImagePath, configFile):
     data = Variable(data)
 
     # Segments image using k-means clustering in Color-(x,y,z) space.
-    labels = segmentation.slic(image, compactness=args.compactness, sigma=args.sigma, n_segments=args.numSuperpixels)
+    labels = segmentation.slic(image, compactness=float(configList[6]), sigma=int(configList[8]), n_segments=float(configList[5]))
     labels = labels.reshape(image.shape[0]*image.shape[1])
     uniqueLabels = np.unique(labels)
     l_inds = []
@@ -118,7 +137,7 @@ def main(inputImagePath, originalImagePath, configFile):
     model.train()
 
     lossFunction = torch.nn.CrossEntropyLoss()
-    optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=0.9) # stochastic gradient descent 
+    optimizer = optim.SGD(model.parameters(), lr=float(configList[3]), momentum=0.9) # stochastic gradient descent 
 
     # generates a 100 x 3 list of integers up to 255 (100 different colors)
     # label_colours = np.random.randint(255, size=(100,3))
@@ -129,17 +148,17 @@ def main(inputImagePath, originalImagePath, configFile):
     print(labelColors)
 
     # optimizes maxIter times
-    for batchIndex in range(args.maxIter):
+    for batchIndex in range(int(configList[1])):
         # forwarding
         optimizer.zero_grad()
         output = model(data)[0]
-        output = output.permute(1, 2, 0).contiguous().view(-1, args.numChannels)
+        output = output.permute(1, 2, 0).contiguous().view(-1, int(configList[0]))
         _, target = torch.max(output, 1)
         imTarget = target.data.cpu().numpy()
         nLabels = len(np.unique(imTarget))
 
         # display image
-        if args.visualize:
+        if configList[7]:
             # colors in segments
             imTargetRGB = np.array([labelColors[c % 100] for c in imTarget])
             imTargetRGB = imTargetRGB.reshape(image.shape).astype(np.uint8)
@@ -169,13 +188,13 @@ def main(inputImagePath, originalImagePath, configFile):
         
         # for pytorch 1.0
         # print (batch_idx, '/', args.maxIter, ':', nLabels, loss.item())
-        if nLabels <= args.minLabels:
-            print ("nLabels", nLabels, "reached minLabels", args.minLabels, ".")
+        if nLabels <= int(configList[2]):
+            print ("nLabels", nLabels, "reached minLabels", configList[2], ".")
             break
 
-    if not args.visualize:
+    if not configList[7]:
         output = model(data)[0]
-        output = output.permute(1, 2, 0).contiguous().view(-1, args.numChannels)
+        output = output.permute(1, 2, 0).contiguous().view(-1, configList[0])
         _, target = torch.max(output, 1)
         imTarget = target.data.cpu().numpy()
         imTargetRGB = np.array([labelColors[c % 10] for c in imTarget])
@@ -200,7 +219,7 @@ def main(inputImagePath, originalImagePath, configFile):
         for contour in contours:
             area = cv2.contourArea(contour)
             arc = cv2.arcLength(contour, False)
-            if area > args.minContour:
+            if area > float(configList[9]):
                 notableContours.append(contour)
                 colorExists = True
     
