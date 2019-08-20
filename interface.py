@@ -7,23 +7,29 @@ import tkinter as tk
 import tkinter.filedialog
 import tkinter.simpledialog
 from tkinter import ttk
-from PIL import ImageTk, Image, ImageEnhance
+from PIL import ImageTk, Image, ImageEnhance, ImageDraw
 from tkinter import Tk, Text, BOTH, W, N, E, S
 from tkinter.ttk import Frame, Button, Label, Style
 import os.path
 from os import path
 import webbrowser
 import unsupervisedSeg
+import cv2
+import numpy as np
 
 img = None # original
 pathToImg = None
 currentImage = None
 newImagePath = None
 configFile = None
+points = []
+pointCount = 0
 componentList = [["EEL", "Empty", None],["IEL", "Empty", None], ["Neointima", "Empty", None], ["Lumen", "Empty", None]]
 
 '''
 Known bugs:
+    Undo is nonfunctional
+    Could crash if a file isn't selected, or no new component name is given
     Duplicate Colors
     Not parsing args from file
     Since I am not removing the "deleted" item from componentList, its returns at the next refresh
@@ -188,7 +194,6 @@ class Segmentation(Frame):
     def addComponent(self):
         global componentList
         inputDialog = tkinter.simpledialog.askstring("Add new component", "Component Name:")
-        
         component = [inputDialog, "Empty", None]
         componentList.append(component)
 
@@ -201,9 +206,69 @@ class Segmentation(Frame):
         #componentList.pop(int(component[-1])-1)
         #self.refreshTree(tree)
 
+    def completeContour(self, points, manCont):
+        global pathToImg
+
+        img = cv2.imread(pathToImg)
+        a = np.array(points)
+        print(a)
+        cv2.drawContours(img, [a], 0, (0,0,255), 2)
+
+        cv2.imshow("Manual Contour", img)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+    
+    def manualContour(self, tree):
+        global pathToImg, pointCount, points
+
+        def clearPoints():
+            points.clear()
+            canvas.delete("point")
+
+        def paint(event):
+            global pointCount
+
+            points.append((event.x, event.y))
+            x1, y1 = (event.x - 3), (event.y - 3)
+            x2, y2 = (event.x + 3), (event.y + 3)
+            canvas.create_oval(x1, y1, x2, y2, fill = "#ff0000", tags=("point", pointCount))
+            pointCount += 1
+
+        def undo(event):
+            global pointCount, points 
+            
+            canvas.delete(pointCount)
+            points.pop()
+            pointCount -= 1
+
+        img = ImageTk.PhotoImage(Image.open(pathToImg))
+        self.pack(fill=BOTH, expand=True)
+        manCont = tk.Toplevel()
+        manCont.wm_title("Manual Contour")
+
+        canvas = tkinter.Canvas(manCont, width=img.width(), height=img.height())
+        canvas.grid(row=0, column=0, rowspan = 3, sticky=N+S+E+W)
+
+        canvas.create_image(0, 0, image=img, anchor="nw")
+
+        # mouseclick events
+        canvas.bind("<Button 1>", paint)
+        canvas.bind("<Button 3>", undo)
+
+        clearContour = tk.Button(manCont, text="Clear Points", command = lambda:[clearPoints()])
+        clearContour.grid(row=0, column=1, padx=10, pady=10, sticky=E+W+S+N)
+
+        complete = tk.Button(manCont, text="Complete Contour", command = lambda:[self.completeContour(points, manCont)])
+        complete.grid(row=1, column=1, padx=10, pady=10, sticky=E+W+S+N)
+
+        saveContour = tk.Button(manCont, text="Save Contour", command = lambda:[self.completeContour(points, manCont)])
+        saveContour.grid(row=2, column=1, padx=10, pady=10, sticky=E+W+S+N)
+
+        manCont.mainloop()
+
     def dataExtraction(self):
         self.pack(fill=BOTH, expand=True)
-        popup = tk.Tk()
+        popup = tk.Toplevel()
         popup.wm_title("Data Extraction")
 
         tree=ttk.Treeview(popup)
@@ -221,11 +286,11 @@ class Segmentation(Frame):
         add = tk.Button(popup, text="Add", command = lambda:[self.addComponent(), self.refreshTree(tree)])
         add.grid(row=3, column=0, padx=10, pady=10, sticky=E+W+S+N)
 
-        edit = tk.Button(popup, text="Edit", command = lambda:[popup.destroy()])
-        edit.grid(row=3, column=1, padx=10, pady=10, sticky=E+W+S+N)
-
         delete = tk.Button(popup, text="Remove", command = lambda:[self.removeComponent(tree)])
-        delete.grid(row=3, column=2, padx=10, pady=10, sticky=E+W+S+N)
+        delete.grid(row=3, column=1, padx=10, pady=10, sticky=E+W+S+N)
+        
+        manual = tk.Button(popup, text="Manual Contour", command = lambda:[self.manualContour(tree)])
+        manual.grid(row=3, column=2, padx=10, pady=10, sticky=E+W+S+N)
 
         exportLabel = tk.Label(popup, text="Export ", font=("Helvetica 12 bold"))
         exportLabel.grid(row=0, column = 3, padx=20, pady=10, sticky=E+W+S+N)
