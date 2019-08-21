@@ -270,7 +270,7 @@ class Segmentation(Frame):
                 self.refreshCanvas(canvas)
             
             else:
-                print("Cannot undo, no points on canvas")
+                print("Cannot undo, no points on canvas.")
 
         img = ImageTk.PhotoImage(Image.open(pathToImg))
         self.pack(fill=BOTH, expand=True)
