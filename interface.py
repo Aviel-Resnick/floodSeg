@@ -260,7 +260,7 @@ class Segmentation(Frame):
             global pointCount, points 
             
             if len(points) > 0:
-                print("undoing")
+                print("undoing...")
 
                 points.pop()
                 pointCount -= 1
