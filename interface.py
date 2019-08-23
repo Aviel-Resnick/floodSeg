@@ -28,7 +28,6 @@ componentList = [["EEL", "Empty", None],["IEL", "Empty", None], ["Neointima", "E
 
 '''
 Known bugs:
-    Undo is nonfunctional
     Could crash if a file isn't selected, or no new component name is given
     Duplicate Colors
     Not parsing args from file
