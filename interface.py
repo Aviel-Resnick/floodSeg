@@ -191,6 +191,28 @@ class Segmentation(Frame):
         for i in range(0, len(componentList)):
             tree.insert("", i, text=componentList[i][0], values=componentList[i][1])
 
+    def clearPoints(self, canvas):
+        global points
+        
+        points.clear()
+        canvas.delete("point")
+
+    def paint(self, x, y, canvas):
+        global pointCount
+        
+        print("painting", points)
+        x1, y1 = (x - 3), (y - 3)
+        x2, y2 = (x + 3), (y + 3)
+        canvas.create_oval(x1, y1, x2, y2, fill = "#ff0000", tags=("point", pointCount))
+        
+
+    def refreshCanvas(self, canvas):
+        global points
+
+        canvas.delete("point")
+        for point in points:
+            self.paint(point[0], point[1], canvas)
+
     def addComponent(self):
         global componentList
         inputDialog = tkinter.simpledialog.askstring("Add new component", "Component Name:")
@@ -205,6 +227,9 @@ class Segmentation(Frame):
 
         #componentList.pop(int(component[-1])-1)
         #self.refreshTree(tree)
+
+    def orderPoints(self):
+        global points
 
     def completeContour(self, points, manCont):
         global pathToImg
@@ -221,25 +246,31 @@ class Segmentation(Frame):
     def manualContour(self, tree):
         global pathToImg, pointCount, points
 
-        def clearPoints():
-            points.clear()
-            canvas.delete("point")
-
-        def paint(event):
+        def prePaint(event):
             global pointCount
+            x = event.x 
+            y = event.y
 
-            points.append((event.x, event.y))
-            x1, y1 = (event.x - 3), (event.y - 3)
-            x2, y2 = (event.x + 3), (event.y + 3)
-            canvas.create_oval(x1, y1, x2, y2, fill = "#ff0000", tags=("point", pointCount))
+            points.append((x, y))
             pointCount += 1
+            
+            self.paint(x, y, canvas)
 
         def undo(event):
             global pointCount, points 
             
-            canvas.delete(pointCount)
-            points.pop()
-            pointCount -= 1
+            if len(points) > 0:
+                print("undoing")
+
+                points.pop()
+                pointCount -= 1
+
+                print(points)
+
+                self.refreshCanvas(canvas)
+            
+            else:
+                print("Cannot undo, no points on canvas")
 
         img = ImageTk.PhotoImage(Image.open(pathToImg))
         self.pack(fill=BOTH, expand=True)
@@ -252,10 +283,10 @@ class Segmentation(Frame):
         canvas.create_image(0, 0, image=img, anchor="nw")
 
         # mouseclick events
-        canvas.bind("<Button 1>", paint)
+        canvas.bind("<Button 1>", prePaint)
         canvas.bind("<Button 3>", undo)
 
-        clearContour = tk.Button(manCont, text="Clear Points", command = lambda:[clearPoints()])
+        clearContour = tk.Button(manCont, text="Clear Points", command = lambda:[self.clearPoints(canvas)])
         clearContour.grid(row=0, column=1, padx=10, pady=10, sticky=E+W+S+N)
 
         complete = tk.Button(manCont, text="Complete Contour", command = lambda:[self.completeContour(points, manCont)])
