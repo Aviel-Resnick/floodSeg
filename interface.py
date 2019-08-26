@@ -178,7 +178,6 @@ class Segmentation(Frame):
         global pathToImg, newImagePath
 
         if newImagePath is None:
-            print("dsfs")
             newImagePath = pathToImg
         #inputFile = pathToImg
         #print(inputFile)
@@ -239,7 +238,7 @@ class Segmentation(Frame):
         #global points
 
         newPoints = []
-        oldPoints = points
+        oldPoints = points.copy()
 
         newPoints.append(oldPoints.pop())
 
