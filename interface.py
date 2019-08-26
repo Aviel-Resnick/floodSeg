@@ -16,6 +16,7 @@ import webbrowser
 import unsupervisedSeg
 import cv2
 import numpy as np
+from math import sqrt
 
 img = None # original
 pathToImg = None
@@ -203,7 +204,6 @@ class Segmentation(Frame):
         x1, y1 = (x - 3), (y - 3)
         x2, y2 = (x + 3), (y + 3)
         canvas.create_oval(x1, y1, x2, y2, fill = "#ff0000", tags=("point", pointCount))
-        
 
     def refreshCanvas(self, canvas):
         global points
@@ -227,20 +227,69 @@ class Segmentation(Frame):
         #componentList.pop(int(component[-1])-1)
         #self.refreshTree(tree)
 
-    def orderPoints(self):
-        global points
+    def getDist(self, pointA, pointB):
+        x1 = pointA[0]
+        y1 = pointA[1]
+        x2 = pointB[0]
+        y2 = pointB[1]
+
+        return(sqrt((x2 - x1)**2 + (y2 - y1)**2))
+
+    def orderPoints(self, points):
+        #global points
+
+        newPoints = []
+        oldPoints = points
+
+        newPoints.append(oldPoints.pop())
+
+        while len(oldPoints) > 0:
+            currentPoint = newPoints[-1]
+            nextPoint = None
+            smallestDist = 999999999999 # lmao praying the distance between two points isn't over a trillion
+            for checkPoint in oldPoints:
+                dist = self.getDist(currentPoint, checkPoint)
+                if dist < smallestDist:
+                    nextPoint = checkPoint
+                    smallestDist = dist
+                    print(smallestDist)
+            newPoints.append(nextPoint)
+            oldPoints.remove(nextPoint)
+
+        print("new points", newPoints)
+        #points = newPoints
+        return newPoints
 
     def completeContour(self, points, manCont):
         global pathToImg
 
         img = cv2.imread(pathToImg)
-        a = np.array(points)
-        print(a)
-        cv2.drawContours(img, [a], 0, (0,0,255), 2)
+        cv2.drawContours(img, self.pointsToContour(points), 0, (0,0,255), 2)
 
         cv2.imshow("Manual Contour", img)
         cv2.waitKey(0)
         cv2.destroyAllWindows()
+
+    def pointsToContour(self, points):
+        a = np.array(points)
+        return([a])
+
+    def saveContour(self, tree, contour):
+        global componentList, points
+
+        selected = tree.focus()
+        currentComponent = tree.item(selected)
+        
+        componentName = currentComponent["text"]
+
+        for i in componentList:
+            if i[0] == componentName:
+                i[1] = "Saved"
+                i[2] = contour
+                points.clear()
+
+        self.refreshTree(tree)
+
     
     def manualContour(self, tree):
         global pathToImg, pointCount, points
@@ -288,10 +337,10 @@ class Segmentation(Frame):
         clearContour = tk.Button(manCont, text="Clear Points", command = lambda:[self.clearPoints(canvas)])
         clearContour.grid(row=0, column=1, padx=10, pady=10, sticky=E+W+S+N)
 
-        complete = tk.Button(manCont, text="Complete Contour", command = lambda:[self.completeContour(points, manCont)])
+        complete = tk.Button(manCont, text="Complete Contour", command = lambda:[self.completeContour(self.orderPoints(points), manCont)])
         complete.grid(row=1, column=1, padx=10, pady=10, sticky=E+W+S+N)
 
-        saveContour = tk.Button(manCont, text="Save Contour", command = lambda:[self.completeContour(points, manCont)])
+        saveContour = tk.Button(manCont, text="Save Contour", command = lambda:[self.orderPoints(canvas), self.saveContour(tree, self.pointsToContour(points)), manCont.destroy()])
         saveContour.grid(row=2, column=1, padx=10, pady=10, sticky=E+W+S+N)
 
         manCont.mainloop()
