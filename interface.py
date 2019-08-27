@@ -1,6 +1,8 @@
 '''
 Aviel Resnick, 2019
-Utility designed for the automated segmentation of images, particulary stented coronary arteries.
+Utility designed for the automated, supervised, or manual segmentation of images, particulary stented coronary arteries.
+
+interface.py - main GUI, manual editing, misc. functions
 '''
 
 import tkinter as tk
@@ -25,6 +27,7 @@ newImagePath = None
 configFile = None
 points = []
 pointCount = 0
+conversion = 0
 componentList = [["EEL", "Empty", None],["IEL", "Empty", None], ["Neointima", "Empty", None], ["Lumen", "Empty", None]]
 
 '''
@@ -38,6 +41,7 @@ To Do:
     Finish data extraction section
     Minor adjustments & full manual
     Comment sections
+    break Segmentation up into multiple classes
     Design and implement component identification
     Area to Metric conversion
     Improve parameters
@@ -171,8 +175,8 @@ class Segmentation(Frame):
         webbrowser.open(configFile)
 
     def calibration(self):
-        inputDialog = tkinter.simpledialog.askstring("Calibration", "1mm = ?px")
-        print(inputDialog)
+        global conversion
+        conversion = tkinter.simpledialog.askstring("Calibration", "1mm = ?px")
      
     def segment(self):
         global pathToImg, newImagePath
@@ -278,7 +282,6 @@ class Segmentation(Frame):
 
         selected = tree.focus()
         currentComponent = tree.item(selected)
-        
         componentName = currentComponent["text"]
 
         for i in componentList:
@@ -288,9 +291,43 @@ class Segmentation(Frame):
                 points.clear()
 
         self.refreshTree(tree)
+
+    def viewContour(self, tree):
+        global componentList, pathToImg
+
+        selected = tree.focus()
+        currentComponent = tree.item(selected)
+        componentName = currentComponent["text"]
+
+        for i in componentList:
+            if i[0] == componentName and i[1] == "Saved":
+                img = cv2.imread(pathToImg)
+                cv2.drawContours(img, i[2], 0, (0,0,255), 2)
+
+                cv2.imshow("Viewing Contour", img)
+                cv2.waitKey(0)
+                cv2.destroyAllWindows()
+    
+    def textProcess(self):
+        global componentList
+
+        outputFile = open("output.txt", "w+")
+
+        for i in componentList:
+            if i[1] == "Saved":
+                currentContour = []
+                for x in i[2][0].tolist():
+                    currentContour.append((x[0],x[1]))
+
+                name = str(i[0])
+                area = str(cv2.contourArea(self.pointsToContour(currentContour)[0]))
+                length = str(cv2.arcLength(self.pointsToContour(currentContour)[0], True))
+                outputFile.write("Component Name: " + str(name) + " Area: " + str(area) + " Length: " + str(length) + "\n")
+
+        outputFile.close()
     
     def manualContour(self, tree):
-        global pathToImg, pointCount, points
+        global pathToImg, pointCount, points, componentList
 
         def preErase(event):
             global pointCount
@@ -375,6 +412,16 @@ class Segmentation(Frame):
         saveContour = tk.Button(manCont, text="Save Contour", command = lambda:[self.saveContour(tree, self.pointsToContour(self.orderPoints(points))), manCont.destroy()])
         saveContour.grid(row=4, column=1, padx=10, pady=10, sticky=E+W+S+N)
 
+        selected = tree.focus()
+        currentComponent = tree.item(selected)
+        componentName = currentComponent["text"]
+
+        for i in componentList:
+            if i[0] == componentName and i[1] == "Saved":
+                for x in i[2][0].tolist():
+                    points.append((x[0],x[1]))
+                    self.paint(x[0], x[1], canvas)
+
         manCont.mainloop()
 
     def dataExtraction(self):
@@ -383,7 +430,7 @@ class Segmentation(Frame):
         popup.wm_title("Data Extraction")
 
         tree=ttk.Treeview(popup)
-        tree.grid(row=0, column=0, columnspan=3, rowspan=3, padx=10, pady=10, sticky=E+W+S+N)
+        tree.grid(row=0, column=0, columnspan=4, rowspan=3, padx=10, pady=10, sticky=E+W+S+N)
 
         tree["columns"]=("one")
         tree.column("#0", width=270, minwidth=270, stretch=tk.NO)
@@ -403,14 +450,17 @@ class Segmentation(Frame):
         manual = tk.Button(popup, text="Manual Contour", command = lambda:[self.manualContour(tree)])
         manual.grid(row=3, column=2, padx=10, pady=10, sticky=E+W+S+N)
 
-        exportLabel = tk.Label(popup, text="Export ", font=("Helvetica 12 bold"))
-        exportLabel.grid(row=0, column = 3, padx=20, pady=10, sticky=E+W+S+N)
+        view = tk.Button(popup, text="View Contour", command = lambda:[self.viewContour(tree)])
+        view.grid(row=3, column=3, padx=10, pady=10, sticky=E+W+S+N)
 
-        text = tk.Button(popup, text=".txt", command = lambda:[popup.destroy()])
-        text.grid(row=1, column=3, padx=10, pady=10, sticky=E+W+S+N)
+        exportLabel = tk.Label(popup, text="Export ", font=("Helvetica 12 bold"))
+        exportLabel.grid(row=0, column = 4, padx=20, pady=10, sticky=E+W+S+N)
+
+        text = tk.Button(popup, text=".txt", command = lambda:[self.textProcess()])
+        text.grid(row=1, column=4, padx=10, pady=10, sticky=E+W+S+N)
 
         excel = tk.Button(popup, text=".xls", command = lambda:[popup.destroy()])
-        excel.grid(row=2, column=3, padx=10, pady=10, sticky=E+W+S+N)
+        excel.grid(row=2, column=4, padx=10, pady=10, sticky=E+W+S+N)
         
         popup.mainloop()
 
