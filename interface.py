@@ -16,6 +16,7 @@ import os.path
 from os import path
 import webbrowser
 import unsupervisedSeg
+from supervisedSeg import SelectionWindow
 import cv2
 import numpy as np
 from math import sqrt
@@ -32,10 +33,12 @@ componentList = [["EEL", "Empty", None],["IEL", "Empty", None], ["Neointima", "E
 
 '''
 Known bugs:
+    Supervised Contour not refreshing after new image
     Could crash if a file isn't selected, or no new component name is given
     Duplicate Colors
     Not parsing args from file
     Since I am not removing the "deleted" item from componentList, its returns at the next refresh
+    Adding components window might be on the wrong layer
 
 To Do:
     Finish data extraction section
@@ -60,6 +63,7 @@ class Segmentation(Frame):
 
     def selectImage(self):
         global pathToImg, img
+        
         pathToImg = tkinter.filedialog.askopenfilename(filetypes=[("Image File",'.jpg')])
         img = Image.open(pathToImg)
         photoImg = ImageTk.PhotoImage(img)
@@ -82,6 +86,8 @@ class Segmentation(Frame):
             resizedImagePath = pathToImg.split('.')[0] + " Resized.png"
             img.save(resizedImagePath)
             pathToImg = resizedImagePath
+
+        self.adjust(1.0, 1.0, 1.0)
 
         self.updateImage(photoImg)
         
@@ -183,9 +189,48 @@ class Segmentation(Frame):
 
         if newImagePath is None:
             newImagePath = pathToImg
-        #inputFile = pathToImg
-        #print(inputFile)
+
         unsupervisedSeg.main(newImagePath, pathToImg, configFile)
+
+    def floodFill(self, tree):
+        global pathToImg, newImagePath
+
+        if newImagePath is None:
+            newImagePath = pathToImg
+
+        image = cv2.imread(newImagePath)
+        
+        selection = SelectionWindow('Selection Window', image, connectivity=8)
+        returnedContours = selection.show(verbose=True)
+
+        exteriorContour = None
+        largestArea = 0
+
+        for i in returnedContours:
+            currentPoints = []
+            for x in i:
+                xVal = x[0][0]
+                yVal = x[0][1]
+                currentPoints.append((xVal,yVal))
+
+            '''
+            for i in currentPoints:
+                for x in currentPoints:
+                    if(x is not i and self.getDist(i, x) < 50):
+                        currentPoints.remove(x)
+            '''
+            
+            points = self.orderPoints(currentPoints)
+            hull = cv2.convexHull(self.pointsToContour(points)[0])
+            
+            area = cv2.contourArea(self.pointsToContour(hull)[0])
+            
+            if(area > largestArea):
+                largestArea = area
+                exteriorContour = self.pointsToContour(hull)[0]
+
+        self.completeContour(exteriorContour)
+        self.saveContour(tree, self.pointsToContour(exteriorContour))
 
     def refreshTree(self, tree):
         global componentList
@@ -255,15 +300,13 @@ class Segmentation(Frame):
                 if dist < smallestDist:
                     nextPoint = checkPoint
                     smallestDist = dist
-                    print(smallestDist)
+
             newPoints.append(nextPoint)
             oldPoints.remove(nextPoint)
 
-        print("new points", newPoints)
-        #points = newPoints
         return newPoints
 
-    def completeContour(self, points, manCont):
+    def completeContour(self, points):
         global pathToImg
 
         img = cv2.imread(pathToImg)
@@ -406,7 +449,7 @@ class Segmentation(Frame):
         clearContour = tk.Button(manCont, text="Clear Points", command = lambda:[self.clearPoints(canvas)])
         clearContour.grid(row=2, column=1, padx=10, pady=10, sticky=E+W+S+N)
 
-        complete = tk.Button(manCont, text="Complete Contour", command = lambda:[self.completeContour(self.orderPoints(points), manCont)])
+        complete = tk.Button(manCont, text="Complete Contour", command = lambda:[self.completeContour(self.orderPoints(points))])
         complete.grid(row=3, column=1, padx=10, pady=10, sticky=E+W+S+N)
 
         saveContour = tk.Button(manCont, text="Save Contour", command = lambda:[self.saveContour(tree, self.pointsToContour(self.orderPoints(points))), manCont.destroy()])
@@ -419,8 +462,12 @@ class Segmentation(Frame):
         for i in componentList:
             if i[0] == componentName and i[1] == "Saved":
                 for x in i[2][0].tolist():
-                    points.append((x[0],x[1]))
-                    self.paint(x[0], x[1], canvas)
+                    if any(isinstance(inst, list) for inst in x):
+                        points.append((x[0][0],x[0][1]))
+                        self.paint(x[0][0], x[0][1], canvas)
+                    else:
+                        points.append((x[0],x[1]))
+                        self.paint(x[0], x[1], canvas)
 
         manCont.mainloop()
 
@@ -430,7 +477,7 @@ class Segmentation(Frame):
         popup.wm_title("Data Extraction")
 
         tree=ttk.Treeview(popup)
-        tree.grid(row=0, column=0, columnspan=4, rowspan=3, padx=10, pady=10, sticky=E+W+S+N)
+        tree.grid(row=0, column=0, columnspan=5, rowspan=3, padx=10, pady=10, sticky=E+W+S+N)
 
         tree["columns"]=("one")
         tree.column("#0", width=270, minwidth=270, stretch=tk.NO)
@@ -446,21 +493,24 @@ class Segmentation(Frame):
 
         delete = tk.Button(popup, text="Remove", command = lambda:[self.removeComponent(tree)])
         delete.grid(row=3, column=1, padx=10, pady=10, sticky=E+W+S+N)
+
+        flood = tk.Button(popup, text="Supervised", command = lambda:[self.floodFill(tree)])
+        flood.grid(row=3, column=2, padx=10, pady=10, sticky=E+W+S+N)
         
         manual = tk.Button(popup, text="Manual Contour", command = lambda:[self.manualContour(tree)])
-        manual.grid(row=3, column=2, padx=10, pady=10, sticky=E+W+S+N)
+        manual.grid(row=3, column=3, padx=10, pady=10, sticky=E+W+S+N)
 
         view = tk.Button(popup, text="View Contour", command = lambda:[self.viewContour(tree)])
-        view.grid(row=3, column=3, padx=10, pady=10, sticky=E+W+S+N)
+        view.grid(row=3, column=5, padx=10, pady=10, sticky=E+W+S+N)
 
         exportLabel = tk.Label(popup, text="Export ", font=("Helvetica 12 bold"))
-        exportLabel.grid(row=0, column = 4, padx=20, pady=10, sticky=E+W+S+N)
+        exportLabel.grid(row=0, column = 5, padx=20, pady=10, sticky=E+W+S+N)
 
         text = tk.Button(popup, text=".txt", command = lambda:[self.textProcess()])
-        text.grid(row=1, column=4, padx=10, pady=10, sticky=E+W+S+N)
+        text.grid(row=1, column=5, padx=10, pady=10, sticky=E+W+S+N)
 
         excel = tk.Button(popup, text=".xls", command = lambda:[popup.destroy()])
-        excel.grid(row=2, column=4, padx=10, pady=10, sticky=E+W+S+N)
+        excel.grid(row=2, column=5, padx=10, pady=10, sticky=E+W+S+N)
         
         popup.mainloop()
 
