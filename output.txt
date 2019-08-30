@@ -1,0 +1,4 @@
+Component Name: Lumen | Area: 43064.5 | Length: 743.0318040847778
+Component Name: Neointima | Area: 80241.0 | Length: 1027.969234585762
+Component Name: Media | Area: 90814.0 | Length: 1079.4961920976639
+Component Name: Thickness | Area: 0.0 | Length: 67.94115447998047

@@ -20,6 +20,7 @@ from supervisedSeg import SelectionWindow
 import cv2
 import numpy as np
 from math import sqrt
+import xlsxwriter
 
 img = None # original
 pathToImg = None
@@ -29,7 +30,8 @@ configFile = None
 points = []
 pointCount = 0
 conversion = 0
-componentList = [["Media", "Empty", None], ["Neointima", "Empty", None], ["Lumen", "Empty", None]]
+componentList = [["Lumen", "Empty", None], ["Neointima", "Empty", None], ["Media", "Empty", None], ["Stents", "Empty", None], ["Thickness", "Empty", None]]
+stentComponents = [["Stent 1", "Empty", None], ["Stent 2", "Empty", None], ["Stent 3", "Empty", None], ["Stent 4", "Empty", None], ["Stent 5", "Empty", None], ["Stent 6", "Empty", None], ["Stent 7", "Empty", None], ["Stent 8", "Empty", None], ["Stent 9", "Empty", None], ["Stent 10", "Empty", None]]
 
 '''
 Known bugs:
@@ -38,9 +40,8 @@ Known bugs:
     Adding components window might be on the wrong layer
 
 To Do:
-    Rework Initial GUI (hide experiment mode)
-    Area to Metric conversion
     Excel Output
+    Additive (Stent) Selection
     Comment sections
     break Segmentation up into multiple classes
     Find alternative to globals in interface
@@ -135,7 +136,7 @@ class Segmentation(Frame):
         labelBrightnessInfo = tk.Label(popup, text="0 = Black, 1 = Original, n > 1 = Brightness Factor")
         labelBrightnessInfo.grid(row=6, column=1, padx=10, pady=0, sticky=E+W+S+N)
 
-        restore = tk.Button(popup, text="Restore to Original", command = lambda:[self.adjust(-1, -1, -1), popup.destroy()])
+        restore = tk.Button(popup, text="Restore to Original", command = lambda:[self.adjust(1, 1, 1), popup.destroy()])
         restore.grid(row=7, column=0, padx=10, pady=10, sticky=E+W+S+N)
 
         submit = tk.Button(popup, text="Confirm Adjustments", command = lambda:[self.adjust(slideSharpness.get(), slideContrast.get(), slideBrightness.get()), popup.destroy()])
@@ -182,6 +183,10 @@ class Segmentation(Frame):
     def calibration(self):
         global conversion
         conversion = tkinter.simpledialog.askstring("Calibration", "1mm = ?px")
+
+    def outputLoc(self):
+        file = tkinter.filedialog.asksaveasfilename(confirmoverwrite=False)
+        self.excelOutput(file)
      
     def segment(self):
         global pathToImg, newImagePath
@@ -211,17 +216,9 @@ class Segmentation(Frame):
                 xVal = x[0][0]
                 yVal = x[0][1]
                 currentPoints.append((xVal,yVal))
-
-            '''
-            for i in currentPoints:
-                for x in currentPoints:
-                    if(x is not i and self.getDist(i, x) < 50):
-                        currentPoints.remove(x)
-            '''
             
             points = self.orderPoints(currentPoints)
             hull = cv2.convexHull(self.pointsToContour(points)[0])
-            
             area = cv2.contourArea(self.pointsToContour(hull)[0])
             
             if(area > largestArea):
@@ -232,11 +229,17 @@ class Segmentation(Frame):
         self.saveContour(tree, self.pointsToContour(exteriorContour))
 
     def refreshTree(self, tree):
-        global componentList
+        global componentList, stentComponents
 
         tree.delete(*tree.get_children()) # kill all the children
         for i in range(0, len(componentList)):
-            tree.insert("", i, text=componentList[i][0], values=componentList[i][1])
+            # Custom for stents (since there are 1-10 of them)
+            if componentList[i][0] == "Stents":
+                tree.insert("", i, "Stents", text=componentList[i][0])
+                for i in range(0, len(stentComponents)):
+                    tree.insert("Stents", i, text=stentComponents[i][0], values=stentComponents[i][1])
+            else:
+                tree.insert("", i, text=componentList[i][0], values=componentList[i][1])
 
     def clearPoints(self, canvas):
         global points
@@ -309,7 +312,7 @@ class Segmentation(Frame):
         global pathToImg
 
         img = cv2.imread(pathToImg)
-        cv2.drawContours(img, self.pointsToContour(points), 0, (0,0,255), 2)
+        cv2.drawContours(img, self.orderPoints(self.pointsToContour(points)), 0, (0,0,255), 2)
 
         cv2.imshow("Manual Contour", img)
         cv2.waitKey(0)
@@ -326,29 +329,54 @@ class Segmentation(Frame):
         currentComponent = tree.item(selected)
         componentName = currentComponent["text"]
 
-        for i in componentList:
-            if i[0] == componentName:
-                i[1] = "Saved"
-                i[2] = contour
-                points.clear()
+        if componentName.split()[0] == "Stent":
+            for x in stentComponents:
+                if x[0] == componentName:
+                    x[1] = "Saved"
+                    x[2] = contour
+                    points.clear()
+        else:
+            for i in componentList:
+                if i[0] == componentName:
+                    i[1] = "Saved"
+                    i[2] = contour
+                    points.clear()
 
         self.refreshTree(tree)
 
     def viewContour(self, tree):
-        global componentList, pathToImg
+        global componentList, stentComponents, pathToImg
 
         selected = tree.focus()
         currentComponent = tree.item(selected)
         componentName = currentComponent["text"]
 
-        for i in componentList:
-            if i[0] == componentName and i[1] == "Saved":
-                img = cv2.imread(pathToImg)
-                cv2.drawContours(img, i[2], 0, (0,0,255), 2)
+        if componentName.split()[0] == "Stent":
+            for x in stentComponents:
+                if x[0] == componentName and x[1] == "Saved":
+                    img = cv2.imread(pathToImg)
+                    cv2.drawContours(img, x[2], 0, (0,0,255), 2)
 
-                cv2.imshow("Viewing Contour", img)
-                cv2.waitKey(0)
-                cv2.destroyAllWindows()
+                    cv2.imshow("Viewing Contour", img)
+                    cv2.waitKey(0)
+                    cv2.destroyAllWindows()
+        elif componentName == "Stents":
+            img = cv2.imread(pathToImg)
+            for x in stentComponents:
+                if x[1] == "Saved":
+                    cv2.drawContours(img, x[2], 0, (0,0,255), 2)
+            cv2.imshow("Viewing Contour", img)
+            cv2.waitKey(0)
+            cv2.destroyAllWindows()
+        else:
+            for i in componentList:
+                if i[0] == componentName and i[1] == "Saved":
+                    img = cv2.imread(pathToImg)
+                    cv2.drawContours(img, i[2], 0, (0,0,255), 2)
+
+                    cv2.imshow("Viewing Contour", img)
+                    cv2.waitKey(0)
+                    cv2.destroyAllWindows()
     
     def textProcess(self):
         global componentList
@@ -375,6 +403,54 @@ class Segmentation(Frame):
                 outputFile.write("Component Name: " + str(name) + " | Area: " + str(area) + " | Length: " + str(length) + "\n")
 
         outputFile.close()
+
+    def excelOutput(self, file):
+        global componentList
+
+        workbook = xlsxwriter.Workbook(str(file) + ".xlsx")
+        worksheet = workbook.add_worksheet()
+
+        row = 0
+        col = 0
+
+        for i in componentList:
+            currentContour = []
+            for x in i[2][0].tolist():
+                if any(isinstance(inst, list) for inst in x):
+                    currentContour.append((x[0][0],x[0][1]))
+                else:
+                    currentContour.append((x[0],x[1]))
+
+            name = str(i[0])
+            area = round(cv2.contourArea(self.pointsToContour(currentContour)[0]), 3)
+            length = round(cv2.arcLength(self.pointsToContour(currentContour)[0], True), 3)
+
+            if conversion != 0:
+                length = round(length/float(conversion), 3)
+                area = round(area/(float(conversion)**2), 3)
+
+            worksheet.write(0, col, (name + " a"))
+            worksheet.write(1, col, area)
+
+            col += 1
+
+            worksheet.write(0, col, (name + " p"))
+            worksheet.write(1, col, length)
+
+            col += 1
+
+        # somewhat hard coded vales
+        worksheet.write(0, col, ("% Stenosis"))
+        worksheet.write(1, col, "=((C2-G2-A2)/C2)*100")
+
+        col += 1
+
+        worksheet.write(0, col, ("N/M"))
+        worksheet.write(1, col, "=(C2-G2-A2)/(E2-C2)")
+
+        col += 1
+
+        workbook.close()
     
     def manualContour(self, tree):
         global pathToImg, pointCount, points, componentList
@@ -466,15 +542,26 @@ class Segmentation(Frame):
         currentComponent = tree.item(selected)
         componentName = currentComponent["text"]
 
-        for i in componentList:
-            if i[0] == componentName and i[1] == "Saved":
-                for x in i[2][0].tolist():
-                    if any(isinstance(inst, list) for inst in x):
-                        points.append((x[0][0],x[0][1]))
-                        self.paint(x[0][0], x[0][1], canvas)
-                    else:
-                        points.append((x[0],x[1]))
-                        self.paint(x[0], x[1], canvas)
+        if componentName.split()[0] == "Stent":
+            for x in stentComponents:
+                if x[0] == componentName and x[1] == "Saved":
+                    for z in x[2][0].tolist():
+                        if any(isinstance(inst, list) for inst in z):
+                            points.append((z[0][0],z[0][1]))
+                            self.paint(z[0][0], z[0][1], canvas)
+                        else:
+                            points.append((z[0],z[1]))
+                            self.paint(z[0], z[1], canvas)
+        else:
+            for i in componentList:
+                if i[0] == componentName and i[1] == "Saved":
+                    for x in i[2][0].tolist():
+                        if any(isinstance(inst, list) for inst in x):
+                            points.append((x[0][0],x[0][1]))
+                            self.paint(x[0][0], x[0][1], canvas)
+                        else:
+                            points.append((x[0],x[1]))
+                            self.paint(x[0], x[1], canvas)
 
         manCont.mainloop()
 
@@ -516,7 +603,7 @@ class Segmentation(Frame):
         text = tk.Button(popup, text=".txt", command = lambda:[self.textProcess(), popup.destroy()])
         text.grid(row=1, column=5, padx=10, pady=10, sticky=E+W+S+N)
 
-        excel = tk.Button(popup, text=".xls", command = lambda:[self.textProcess(), popup.destroy()])
+        excel = tk.Button(popup, text=".xls", command = lambda:[self.outputLoc(), popup.destroy()])
         excel.grid(row=2, column=5, padx=10, pady=10, sticky=E+W+S+N)
         
         popup.mainloop()

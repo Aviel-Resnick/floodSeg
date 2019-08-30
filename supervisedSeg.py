@@ -28,7 +28,7 @@ class SelectionWindow:
 
         # parameters for floodfill
         self.connectivity = connectivity
-        self._tolerance = (20,)*3
+        self._tolerance = (25,)*3
         self._seed_point = Point(0, 0)
         self._flood_mask = np.zeros((self._h+2, self._w+2), dtype=np.uint8)
 
@@ -55,10 +55,10 @@ class SelectionWindow:
         self._selection = self._image.copy()
         
         # FOR PRODUCTION
-        self._contours, _ = cv2.findContours(self._mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+        #self._contours, _ = cv2.findContours(self._mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
         
-        # FOR TESTINT
-        #_, self._contours, _ = cv2.findContours(self._mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+        # FOR TESTING
+        _, self._contours, _ = cv2.findContours(self._mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
 
         print(self._contours)
         cv2.drawContours(self._selection, self._contours, -1, color=(0, 0, 255), thickness=2)
@@ -94,7 +94,6 @@ class SelectionWindow:
         if verbose:
             print('Click anywhere to select a region of similar colors.')
             print('Move the slider to include a wider range of colors.\n')
-        print(('Press [m] to switch between displaying the selection, mask, or applied mask'))
         print('Press [q], [esc], or [space] to close the window')
         print('------------------------------------------------------------\n')
 
