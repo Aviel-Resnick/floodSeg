@@ -1,6 +1,8 @@
 '''
 Aviel Resnick, 2019
-Utility designed for the automated segmentation of images, particulary stented coronary arteries.
+Utility designed for the automated, supervised, or manual segmentation of images, particulary stented coronary arteries.
+
+interface.py - main GUI, manual editing, misc. functions
 '''
 
 import tkinter as tk
@@ -13,9 +15,11 @@ from tkinter.ttk import Frame, Button, Label, Style
 import os.path
 from os import path
 import webbrowser
-import unsupervisedSeg
+### import unsupervisedSeg
+from supervisedSeg import SelectionWindow
 import cv2
 import numpy as np
+from math import sqrt
 
 img = None # original
 pathToImg = None
@@ -24,22 +28,21 @@ newImagePath = None
 configFile = None
 points = []
 pointCount = 0
-componentList = [["EEL", "Empty", None],["IEL", "Empty", None], ["Neointima", "Empty", None], ["Lumen", "Empty", None]]
+conversion = 0
+componentList = [["Media", "Empty", None], ["Neointima", "Empty", None], ["Lumen", "Empty", None]]
 
 '''
 Known bugs:
     Could crash if a file isn't selected, or no new component name is given
-    Duplicate Colors
-    Not parsing args from file
     Since I am not removing the "deleted" item from componentList, its returns at the next refresh
+    Adding components window might be on the wrong layer
 
 To Do:
-    Finish data extraction section
-    Minor adjustments & full manual
-    Comment sections
-    Design and implement component identification
+    Rework Initial GUI (hide experiment mode)
     Area to Metric conversion
-    Improve parameters
+    Excel Output
+    Comment sections
+    break Segmentation up into multiple classes
     Find alternative to globals in interface
         Lambda is the answer
 
@@ -55,6 +58,7 @@ class Segmentation(Frame):
 
     def selectImage(self):
         global pathToImg, img
+        
         pathToImg = tkinter.filedialog.askopenfilename(filetypes=[("Image File",'.jpg')])
         img = Image.open(pathToImg)
         photoImg = ImageTk.PhotoImage(img)
@@ -78,6 +82,12 @@ class Segmentation(Frame):
             img.save(resizedImagePath)
             pathToImg = resizedImagePath
 
+        self.adjust(1.0, 1.0, 1.0)
+
+        for i in componentList:
+            i[1] = "Empty"
+            i[2] = None
+
         self.updateImage(photoImg)
         
         self.master.geometry("")
@@ -88,7 +98,7 @@ class Segmentation(Frame):
         panel = tk.Label(self, image = image)
         panel.image = image
         currentImage = image
-        panel.grid(row=1, column=0, columnspan=2, rowspan=6, padx=5, sticky=E+W+S+N)
+        panel.grid(row=1, column=0, columnspan=2, rowspan=5, padx=5, sticky=E+W+S+N)
     
     def chooseAdjust(self):
         self.pack(fill=BOTH, expand=True)
@@ -170,18 +180,56 @@ class Segmentation(Frame):
         webbrowser.open(configFile)
 
     def calibration(self):
-        inputDialog = tkinter.simpledialog.askstring("Calibration", "1mm = ?px")
-        print(inputDialog)
+        global conversion
+        conversion = tkinter.simpledialog.askstring("Calibration", "1mm = ?px")
      
     def segment(self):
         global pathToImg, newImagePath
 
         if newImagePath is None:
-            print("dsfs")
             newImagePath = pathToImg
-        #inputFile = pathToImg
-        #print(inputFile)
-        unsupervisedSeg.main(newImagePath, pathToImg, configFile)
+
+        ### unsupervisedSeg.main(newImagePath, pathToImg, configFile)
+
+    def floodFill(self, tree):
+        global pathToImg, newImagePath
+
+        if newImagePath is None:
+            newImagePath = pathToImg
+
+        image = cv2.imread(newImagePath)
+        
+        selection = SelectionWindow('Selection Window', image, connectivity=8)
+        returnedContours = selection.show(verbose=True)
+
+        exteriorContour = None
+        largestArea = 0
+
+        for i in returnedContours:
+            currentPoints = []
+            for x in i:
+                xVal = x[0][0]
+                yVal = x[0][1]
+                currentPoints.append((xVal,yVal))
+
+            '''
+            for i in currentPoints:
+                for x in currentPoints:
+                    if(x is not i and self.getDist(i, x) < 50):
+                        currentPoints.remove(x)
+            '''
+            
+            points = self.orderPoints(currentPoints)
+            hull = cv2.convexHull(self.pointsToContour(points)[0])
+            
+            area = cv2.contourArea(self.pointsToContour(hull)[0])
+            
+            if(area > largestArea):
+                largestArea = area
+                exteriorContour = self.pointsToContour(hull)[0]
+
+        self.completeContour(exteriorContour)
+        self.saveContour(tree, self.pointsToContour(exteriorContour))
 
     def refreshTree(self, tree):
         global componentList
@@ -203,7 +251,6 @@ class Segmentation(Frame):
         x1, y1 = (x - 3), (y - 3)
         x2, y2 = (x + 3), (y + 3)
         canvas.create_oval(x1, y1, x2, y2, fill = "#ff0000", tags=("point", pointCount))
-        
 
     def refreshCanvas(self, canvas):
         global points
@@ -227,23 +274,132 @@ class Segmentation(Frame):
         #componentList.pop(int(component[-1])-1)
         #self.refreshTree(tree)
 
-    def orderPoints(self):
-        global points
+    def getDist(self, pointA, pointB):
+        x1 = pointA[0]
+        y1 = pointA[1]
+        x2 = pointB[0]
+        y2 = pointB[1]
 
-    def completeContour(self, points, manCont):
+        return(sqrt((x2 - x1)**2 + (y2 - y1)**2))
+
+    def orderPoints(self, points):
+        #global points
+
+        newPoints = []
+        oldPoints = points.copy()
+
+        newPoints.append(oldPoints.pop())
+
+        while len(oldPoints) > 0:
+            currentPoint = newPoints[-1]
+            nextPoint = None
+            smallestDist = 999999999999 # lmao praying the distance between two points isn't over a trillion
+            for checkPoint in oldPoints:
+                dist = self.getDist(currentPoint, checkPoint)
+                if dist < smallestDist:
+                    nextPoint = checkPoint
+                    smallestDist = dist
+
+            newPoints.append(nextPoint)
+            oldPoints.remove(nextPoint)
+
+        return newPoints
+
+    def completeContour(self, points):
         global pathToImg
 
         img = cv2.imread(pathToImg)
-        a = np.array(points)
-        print(a)
-        cv2.drawContours(img, [a], 0, (0,0,255), 2)
+        cv2.drawContours(img, self.pointsToContour(points), 0, (0,0,255), 2)
 
         cv2.imshow("Manual Contour", img)
         cv2.waitKey(0)
         cv2.destroyAllWindows()
+
+    def pointsToContour(self, points):
+        a = np.array(points)
+        return([a])
+
+    def saveContour(self, tree, contour):
+        global componentList, points
+
+        selected = tree.focus()
+        currentComponent = tree.item(selected)
+        componentName = currentComponent["text"]
+
+        for i in componentList:
+            if i[0] == componentName:
+                i[1] = "Saved"
+                i[2] = contour
+                points.clear()
+
+        self.refreshTree(tree)
+
+    def viewContour(self, tree):
+        global componentList, pathToImg
+
+        selected = tree.focus()
+        currentComponent = tree.item(selected)
+        componentName = currentComponent["text"]
+
+        for i in componentList:
+            if i[0] == componentName and i[1] == "Saved":
+                img = cv2.imread(pathToImg)
+                cv2.drawContours(img, i[2], 0, (0,0,255), 2)
+
+                cv2.imshow("Viewing Contour", img)
+                cv2.waitKey(0)
+                cv2.destroyAllWindows()
+    
+    def textProcess(self):
+        global componentList
+
+        outputFile = open("output.txt", "w+")
+
+        for i in componentList:
+            if i[1] == "Saved":
+                currentContour = []
+                for x in i[2][0].tolist():
+                    if any(isinstance(inst, list) for inst in x):
+                        currentContour.append((x[0][0],x[0][1]))
+                    else:
+                        currentContour.append((x[0],x[1]))
+
+                name = str(i[0])
+                area = cv2.contourArea(self.pointsToContour(currentContour)[0])
+                length = cv2.arcLength(self.pointsToContour(currentContour)[0], True)
+
+                if conversion != 0:
+                    length = length/float(conversion)
+                    area = area/(float(conversion)**2)
+
+                outputFile.write("Component Name: " + str(name) + " | Area: " + str(area) + " | Length: " + str(length) + "\n")
+
+        outputFile.close()
     
     def manualContour(self, tree):
-        global pathToImg, pointCount, points
+        global pathToImg, pointCount, points, componentList
+
+        def preErase(event):
+            global pointCount
+            x = event.x 
+            y = event.y
+
+            closestPoint = None
+            shortestDist = 9999999999999
+            for point in points:
+                dist = self.getDist((x,y), point)
+                if dist < shortestDist:
+                    shortestDist = dist
+                    closestPoint = point
+            
+            print(closestPoint)
+            points.remove(closestPoint)
+            self.refreshCanvas(canvas)
+
+            #points.append((x, y))
+            #pointCount += 1
+            
+            #self.paint(x, y, canvas)
 
         def prePaint(event):
             global pointCount
@@ -277,7 +433,7 @@ class Segmentation(Frame):
         manCont.wm_title("Manual Contour")
 
         canvas = tkinter.Canvas(manCont, width=img.width(), height=img.height())
-        canvas.grid(row=0, column=0, rowspan = 3, sticky=N+S+E+W)
+        canvas.grid(row=0, column=0, rowspan = 5, sticky=N+S+E+W)
 
         canvas.create_image(0, 0, image=img, anchor="nw")
 
@@ -285,14 +441,40 @@ class Segmentation(Frame):
         canvas.bind("<Button 1>", prePaint)
         canvas.bind("<Button 3>", undo)
 
+        def eraseMode():
+            canvas.bind("<Button 1>", preErase)
+
+        def addMode():
+            canvas.bind("<Button 1>", prePaint)
+
+        add = tk.Button(manCont, text="Add Mode", command = lambda:[addMode()])
+        add.grid(row=0, column=1, padx=10, pady=10, sticky=E+W+S+N)
+
+        erase = tk.Button(manCont, text="Erase Mode", command = lambda:[eraseMode()])
+        erase.grid(row=1, column=1, padx=10, pady=10, sticky=E+W+S+N)
+        
         clearContour = tk.Button(manCont, text="Clear Points", command = lambda:[self.clearPoints(canvas)])
-        clearContour.grid(row=0, column=1, padx=10, pady=10, sticky=E+W+S+N)
+        clearContour.grid(row=2, column=1, padx=10, pady=10, sticky=E+W+S+N)
 
-        complete = tk.Button(manCont, text="Complete Contour", command = lambda:[self.completeContour(points, manCont)])
-        complete.grid(row=1, column=1, padx=10, pady=10, sticky=E+W+S+N)
+        complete = tk.Button(manCont, text="Complete Contour", command = lambda:[self.completeContour(self.orderPoints(points))])
+        complete.grid(row=3, column=1, padx=10, pady=10, sticky=E+W+S+N)
 
-        saveContour = tk.Button(manCont, text="Save Contour", command = lambda:[self.completeContour(points, manCont)])
-        saveContour.grid(row=2, column=1, padx=10, pady=10, sticky=E+W+S+N)
+        saveContour = tk.Button(manCont, text="Save Contour", command = lambda:[self.saveContour(tree, self.pointsToContour(self.orderPoints(points))), manCont.destroy()])
+        saveContour.grid(row=4, column=1, padx=10, pady=10, sticky=E+W+S+N)
+
+        selected = tree.focus()
+        currentComponent = tree.item(selected)
+        componentName = currentComponent["text"]
+
+        for i in componentList:
+            if i[0] == componentName and i[1] == "Saved":
+                for x in i[2][0].tolist():
+                    if any(isinstance(inst, list) for inst in x):
+                        points.append((x[0][0],x[0][1]))
+                        self.paint(x[0][0], x[0][1], canvas)
+                    else:
+                        points.append((x[0],x[1]))
+                        self.paint(x[0], x[1], canvas)
 
         manCont.mainloop()
 
@@ -302,7 +484,7 @@ class Segmentation(Frame):
         popup.wm_title("Data Extraction")
 
         tree=ttk.Treeview(popup)
-        tree.grid(row=0, column=0, columnspan=3, rowspan=3, padx=10, pady=10, sticky=E+W+S+N)
+        tree.grid(row=0, column=0, columnspan=5, rowspan=3, padx=10, pady=10, sticky=E+W+S+N)
 
         tree["columns"]=("one")
         tree.column("#0", width=270, minwidth=270, stretch=tk.NO)
@@ -318,19 +500,41 @@ class Segmentation(Frame):
 
         delete = tk.Button(popup, text="Remove", command = lambda:[self.removeComponent(tree)])
         delete.grid(row=3, column=1, padx=10, pady=10, sticky=E+W+S+N)
+
+        flood = tk.Button(popup, text="Supervised", command = lambda:[self.floodFill(tree)])
+        flood.grid(row=3, column=2, padx=10, pady=10, sticky=E+W+S+N)
         
         manual = tk.Button(popup, text="Manual Contour", command = lambda:[self.manualContour(tree)])
-        manual.grid(row=3, column=2, padx=10, pady=10, sticky=E+W+S+N)
+        manual.grid(row=3, column=3, padx=10, pady=10, sticky=E+W+S+N)
+
+        view = tk.Button(popup, text="View Contour", command = lambda:[self.viewContour(tree)])
+        view.grid(row=3, column=5, padx=10, pady=10, sticky=E+W+S+N)
 
         exportLabel = tk.Label(popup, text="Export ", font=("Helvetica 12 bold"))
-        exportLabel.grid(row=0, column = 3, padx=20, pady=10, sticky=E+W+S+N)
+        exportLabel.grid(row=0, column = 5, padx=20, pady=10, sticky=E+W+S+N)
 
-        text = tk.Button(popup, text=".txt", command = lambda:[popup.destroy()])
-        text.grid(row=1, column=3, padx=10, pady=10, sticky=E+W+S+N)
+        text = tk.Button(popup, text=".txt", command = lambda:[self.textProcess(), popup.destroy()])
+        text.grid(row=1, column=5, padx=10, pady=10, sticky=E+W+S+N)
 
-        excel = tk.Button(popup, text=".xls", command = lambda:[popup.destroy()])
-        excel.grid(row=2, column=3, padx=10, pady=10, sticky=E+W+S+N)
+        excel = tk.Button(popup, text=".xls", command = lambda:[self.textProcess(), popup.destroy()])
+        excel.grid(row=2, column=5, padx=10, pady=10, sticky=E+W+S+N)
         
+        popup.mainloop()
+
+    def experimental(self):
+        self.pack(fill=BOTH, expand=True)
+        popup = tk.Toplevel()
+        popup.wm_title("Experimental")
+
+        exportLabel = tk.Label(popup, text="CNN Tuning & Launch", font=("Helvetica 12 bold"))
+        exportLabel.grid(row=0, column=0, columnspan=2, padx=20, pady=10, sticky=E+W+S+N)
+
+        btnTune = Button(popup, text="Manual Tuning", command = lambda:[self.tune()])
+        btnTune.grid(row=1, column=0, padx=5, pady=10, sticky=E+W+S+N)
+
+        btnSegment = Button(popup, text="Start CNN", command = lambda:[self.segment()])
+        btnSegment.grid(row=1, column=1, padx=5, pady=10, sticky=E+W+S+N)
+
         popup.mainloop()
 
     def initUI(self):
@@ -344,7 +548,7 @@ class Segmentation(Frame):
         
         panel = tk.Label(self, text = "Image will appear here.", bg="white")
         #panel.image = photoImg
-        panel.grid(row=1, column=0, columnspan=2, rowspan=6, padx=10, pady=10, sticky=E+W+S+N)
+        panel.grid(row=1, column=0, columnspan=2, rowspan=5, padx=10, pady=10, sticky=E+W+S+N)
 
         btnSelect = Button(self, text="Select an Image", command = self.selectImage)
         btnSelect.grid(row=1, column=3, padx=10, pady=20, sticky=E+W+S+N)
@@ -352,21 +556,18 @@ class Segmentation(Frame):
         btnAdjust = Button(self, text="Image Adjustments", command = self.chooseAdjust)
         btnAdjust.grid(row=2, column=3, padx=10, pady=20, sticky=E+W+S+N)
 
-        btnTune = Button(self, text="Manual Tuning", command = self.tune)
-        btnTune.grid(row=3, column=3, padx=10, pady=20, sticky=E+W+S+N)
-
         btnCalibrate = Button(self, text="Calibration", command = self.calibration)
-        btnCalibrate.grid(row=4, column=3, padx=10, pady=20, sticky=E+W+S+N)
+        btnCalibrate.grid(row=3, column=3, padx=10, pady=20, sticky=E+W+S+N)
+        
+        btnPartition = Button(self, text="Data Extraction", command = lambda:[self.dataExtraction()])
+        btnPartition.grid(row=4, column=3, padx=10, pady=20, sticky=E+W+S+N)
 
-        btnSegment = Button(self, text="Train & Segment", command = self.segment)
-        btnSegment.grid(row=5, column=3, padx=10, pady=20, sticky=E+W+S+N)
-
-        btnPartition = Button(self, text="Data Extraction", command = self.dataExtraction)
-        btnPartition.grid(row=6, column=3, padx=10, pady=20, sticky=E+W+S+N)
-
+        btnExp = Button(self, text="Experimental Mode", command = lambda:[self.experimental()])
+        btnExp.grid(row=5, column=3, padx=10, pady=20, sticky=E+W+S+N)
+        
 def main():
     root = Tk()
-    root.geometry("350x390")
+    root.geometry("350x325")
     #root.geometry("")
     app = Segmentation()
     root.mainloop()

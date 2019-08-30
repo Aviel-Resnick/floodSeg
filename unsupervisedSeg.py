@@ -1,15 +1,22 @@
+'''
+Aviel Resnick, 2019
+Utility designed for the automated, supervised, or manual segmentation of images, particulary stented coronary arteries.
+
+unsupervisedSeg.py - controls automated segmentation
+'''
+
 import argparse
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+import torch.nn.init
 from torchvision import datasets, transforms
 from torch.autograd import Variable
 import cv2
 import sys
 import numpy as np
 from skimage import segmentation
-import torch.nn.init
 import random
 args = 0
 
