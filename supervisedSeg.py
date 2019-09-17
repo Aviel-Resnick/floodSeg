@@ -1,10 +1,17 @@
+'''
+Aviel Resnick, 2019
+Utility designed for the automated, supervised, or manual morphometry of images, particularly stent-implanted coronary arteries.
+
+supervisedSeg.py - controls supervised segmentation (through Data Exctraction menu)
+'''
+
 import cv2
 import numpy as np
 from collections import namedtuple
 from itertools import cycle
 
-
 Point = namedtuple('Point', 'x, y')
+compContours = []
 
 class SelectionWindow:
     #_displays = cycle(['selection', 'mask', 'applied mask'])
@@ -22,6 +29,10 @@ class SelectionWindow:
             self._channels = 1
         
         self._selection = image.copy()
+
+        for i in compContours:
+            cv2.drawContours(self._selection, i, -1, color=(0, 0, 255), thickness=2)
+
         self._mask = 255*np.ones((self._h, self._w), dtype=np.uint8)
         self._applied_mask = image.copy()
         self._curr_display = next(self._displays)
@@ -60,8 +71,10 @@ class SelectionWindow:
         # FOR TESTING
         _, self._contours, _ = cv2.findContours(self._mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
 
-        print(self._contours)
+        #print(self._contours)
         cv2.drawContours(self._selection, self._contours, -1, color=(0, 0, 255), thickness=2)
+        for i in compContours:
+            cv2.drawContours(self._selection, i, -1, color=(0, 0, 255), thickness=2)
 
     def _flip_displays(self):
         self._curr_display = next(self._displays)
@@ -77,6 +90,7 @@ class SelectionWindow:
     def _update_window(self):
         if self._curr_display == 'selection':
             self._drawselection()
+            #cv2.imshow(self.name, self._selection)
             cv2.imshow(self.name, self._selection)
         elif self._curr_display == 'mask':
             cv2.imshow(self.name, self._mask)
@@ -91,13 +105,10 @@ class SelectionWindow:
         cv2.createTrackbar('Tolerance', self.name, self._tolerance[0], 255, self._onchange)
         self.verbose = verbose
 
-        if verbose:
-            print('Click anywhere to select a region of similar colors.')
-            print('Move the slider to include a wider range of colors.\n')
-        print('Press [q], [esc], or [space] to close the window')
-        print('------------------------------------------------------------\n')
-
         # display the image and wait for a keypress or trackbar change
+        for i in compContours:
+            cv2.drawContours(self._image, i, -1, color=(0, 0, 255), thickness=2)
+
         cv2.imshow(self.name, self._image)
 
         while(True):
@@ -105,10 +116,18 @@ class SelectionWindow:
             # q, esc, or space close the window
             if k == ord('q') or k == 27 or k == 32:
                 self._close()
-                return(self._contours)
+                print("Q Pressed; Stopping")
+                #print(compContours)
+                compContours.clear()
+                return((False, self._contours))
                 break
-            elif k == ord('m'):
-                self._flip_displays()
+            elif k == ord('a'):
+                #self._close()
+                print("A Pressed; Going Again")
+                compContours.append(self._contours)
+                #print(compContours)
+                return((True, self._contours)) # go again
+                break
 
     @property
     def mask(self):
@@ -133,36 +152,6 @@ class SelectionWindow:
     @property
     def seedpt(self):
         return self._seed_point
-
-    @property
-    def mean(self):
-        mean = cv2.meanStdDev(self._image, self._mask)[0]
-        if self._channels == 1:
-            return mean[0, 0]
-        return mean[:, 0]
-
-    @property
-    def stddev(self):
-        stddev = cv2.meanStdDev(self._image, self._mask)[1]
-        if self._channels == 1:
-            return stddev[0, 0]
-        return stddev[:, 0]
-
-    @property
-    def min(self):
-        if self._channels == 1:
-            return cv2.minMaxLoc(self._image, self._mask)[0]
-
-        min_val = [cv2.minMaxLoc(self._image[:, :, i], self._mask)[0] for i in range(3)]
-        return np.array(min_val, dtype=np.uint8)
-
-    @property
-    def max(self):
-        if self._channels == 1:
-            return cv2.minMaxLoc(self._image, self._mask)[1]
-        
-        max_val = [cv2.minMaxLoc(self._image[:, :, i], self._mask)[1] for i in range(3)]
-        return np.array(max_val, dtype=np.uint8)
 
 if __name__ == '__main__':
     main()

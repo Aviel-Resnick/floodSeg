@@ -1,6 +1,6 @@
 '''
 Aviel Resnick, 2019
-Utility designed for the automated, supervised, or manual segmentation of images, particulary stented coronary arteries.
+Utility designed for the automated, supervised, or manual morphometry of images, particularly stent-implanted coronary arteries.
 
 interface.py - main GUI, manual editing, misc. functions
 '''
@@ -21,6 +21,14 @@ import cv2
 import numpy as np
 from math import sqrt
 import xlsxwriter
+from shapely.geometry import Polygon, LineString
+import math
+import matplotlib.pyplot as plt
+
+COLOR = {
+    True:  '#6699cc',
+    False: '#ffcc33'
+    }
 
 img = None # original
 pathToImg = None
@@ -32,6 +40,8 @@ pointCount = 0
 conversion = 0
 componentList = [["Lumen", "Empty", None], ["Neointima", "Empty", None], ["Media", "Empty", None], ["Stents", "Empty", None], ["Thickness", "Empty", None]]
 stentComponents = [["Stent 1", "Empty", None], ["Stent 2", "Empty", None], ["Stent 3", "Empty", None], ["Stent 4", "Empty", None], ["Stent 5", "Empty", None], ["Stent 6", "Empty", None], ["Stent 7", "Empty", None], ["Stent 8", "Empty", None], ["Stent 9", "Empty", None], ["Stent 10", "Empty", None]]
+finalComps = {}
+currentName = ""
 
 '''
 Known bugs:
@@ -203,30 +213,35 @@ class Segmentation(Frame):
             newImagePath = pathToImg
 
         image = cv2.imread(newImagePath)
+
+        repeat = True
         
-        selection = SelectionWindow('Selection Window', image, connectivity=8)
-        returnedContours = selection.show(verbose=True)
+        while repeat:
+            selection = SelectionWindow('Selection Window', image, connectivity=8)
+            output = selection.show(verbose=True)
+            repeat = output[0]
+            returnedContours = output[1]
 
-        exteriorContour = None
-        largestArea = 0
+            exteriorContour = None
+            largestArea = 0
 
-        for i in returnedContours:
-            currentPoints = []
-            for x in i:
-                xVal = x[0][0]
-                yVal = x[0][1]
-                currentPoints.append((xVal,yVal))
-            
-            points = self.orderPoints(currentPoints)
-            hull = cv2.convexHull(self.pointsToContour(points)[0])
-            area = cv2.contourArea(self.pointsToContour(hull)[0])
-            
-            if(area > largestArea):
-                largestArea = area
-                exteriorContour = self.pointsToContour(hull)[0]
+            for i in returnedContours:
+                currentPoints = []
+                for x in i:
+                    xVal = x[0][0]
+                    yVal = x[0][1]
+                    currentPoints.append((xVal,yVal))
+                
+                points = self.orderPoints(currentPoints)
+                hull = cv2.convexHull(self.pointsToContour(points)[0])
+                area = cv2.contourArea(self.pointsToContour(hull)[0])
+                
+                if(area > largestArea):
+                    largestArea = area
+                    exteriorContour = self.pointsToContour(hull)[0]
 
-        self.completeContour(exteriorContour)
-        self.saveContour(tree, self.pointsToContour(exteriorContour))
+            #self.completeContour(exteriorContour)
+            self.saveContour(tree, self.pointsToContour(exteriorContour))
 
     def refreshTree(self, tree):
         global componentList, stentComponents
@@ -250,7 +265,7 @@ class Segmentation(Frame):
     def paint(self, x, y, canvas):
         global pointCount
         
-        print("painting", points)
+        #print("painting", points)
         x1, y1 = (x - 3), (y - 3)
         x2, y2 = (x + 3), (y + 3)
         canvas.create_oval(x1, y1, x2, y2, fill = "#ff0000", tags=("point", pointCount))
@@ -286,12 +301,13 @@ class Segmentation(Frame):
         return(sqrt((x2 - x1)**2 + (y2 - y1)**2))
 
     def orderPoints(self, points):
-        #global points
+        global componentList
 
         newPoints = []
         oldPoints = points.copy()
 
-        newPoints.append(oldPoints.pop())
+        if len(oldPoints) > 0:
+            newPoints.append(oldPoints.pop())
 
         while len(oldPoints) > 0:
             currentPoint = newPoints[-1]
@@ -312,6 +328,7 @@ class Segmentation(Frame):
         global pathToImg
 
         img = cv2.imread(pathToImg)
+
         cv2.drawContours(img, self.orderPoints(self.pointsToContour(points)), 0, (0,0,255), 2)
 
         cv2.imshow("Manual Contour", img)
@@ -323,28 +340,71 @@ class Segmentation(Frame):
         return([a])
 
     def saveContour(self, tree, contour):
-        global componentList, points
+        global componentList, points, finalComps, currentName
+        
+        selected = tree.focus()
+        currentComponent = tree.item(selected)
+        componentName = currentComponent["text"]
+        if componentName != "":
+            currentName = componentName
+
+        print("Saving", currentName)
+
+        if currentName in finalComps:
+            print("ALREADY EXISTS")
+            finalComps[currentName].append(contour)
+
+        else:
+            finalComps.update({currentName : [contour]})
+
+        ####print(finalComps)
+
+        '''
+
+        if componentName.split()[0] == "Stent":
+            for x in stentComponents:
+                if x[0] == componentName:
+                    if contour != []:
+                        x[1] = "Saved"
+                        x[2] = contour
+                        points.clear()
+                    else:
+                        x[1] = "Empty"
+                        x[2] = contour
+                        points.clear()
+        else:
+            for i in componentList:
+                if i[0] == componentName:
+                    if contour != [] or contour != [[]] or contour != None:
+                        i[1] = "Saved"
+                        i[2] = contour
+                        points.clear()
+                    else:
+                        i[1] = "Empty"
+                        i[2] = contour
+                        points.clear()
+
+        '''
+
+        self.refreshTree(tree)
+    
+    def viewContour(self, tree):
+        global componentList, stentComponents, pathToImg, finalComps
 
         selected = tree.focus()
         currentComponent = tree.item(selected)
         componentName = currentComponent["text"]
 
-        if componentName.split()[0] == "Stent":
-            for x in stentComponents:
-                if x[0] == componentName:
-                    x[1] = "Saved"
-                    x[2] = contour
-                    points.clear()
-        else:
-            for i in componentList:
-                if i[0] == componentName:
-                    i[1] = "Saved"
-                    i[2] = contour
-                    points.clear()
+        if componentName in finalComps:
+            img = cv2.imread(pathToImg)
+            for i in finalComps[componentName]:
+                cv2.drawContours(img, i, 0, (0,0,255), 2)
 
-        self.refreshTree(tree)
+            cv2.imshow("Viewing Contour", img)
+            cv2.waitKey(0)
+            cv2.destroyAllWindows()
 
-    def viewContour(self, tree):
+    def viewContourOld(self, tree):
         global componentList, stentComponents, pathToImg
 
         selected = tree.focus()
@@ -384,6 +444,22 @@ class Segmentation(Frame):
         outputFile = open("output.txt", "w+")
 
         for i in componentList:
+            stentArea = 0
+            if str(i[0]) == "Stents":
+                for x in stentComponents:
+                    if x[1] == "Saved":
+                        currentContour = []
+                        for y in x[2][0].tolist():
+                            if any(isinstance(inst, list) for inst in y):
+                                currentContour.append((y[0][0],y[0][1]))
+                            else:
+                                currentContour.append((y[0],y[1]))
+
+                        area = round(cv2.contourArea(self.pointsToContour(currentContour)[0]), 3)
+                        stentArea += area
+
+                outputFile.write("Component Name: " + "Stents" + " | Area: " + str(stentArea) + "\n")
+
             if i[1] == "Saved":
                 currentContour = []
                 for x in i[2][0].tolist():
@@ -405,7 +481,7 @@ class Segmentation(Frame):
         outputFile.close()
 
     def excelOutput(self, file):
-        global componentList
+        global componentList, stentComponents, finalComps
 
         workbook = xlsxwriter.Workbook(str(file) + ".xlsx")
         worksheet = workbook.add_worksheet()
@@ -414,39 +490,93 @@ class Segmentation(Frame):
         col = 0
 
         for i in componentList:
-            currentContour = []
-            for x in i[2][0].tolist():
-                if any(isinstance(inst, list) for inst in x):
-                    currentContour.append((x[0][0],x[0][1]))
-                else:
-                    currentContour.append((x[0],x[1]))
+            stentArea = 0
+            if str(i[0]) == "Stents":
+                for x in stentComponents:
+                    if x[1] == "Saved":
+                        currentContour = []
+                        for y in x[2][0].tolist():
+                            if any(isinstance(inst, list) for inst in y):
+                                currentContour.append((y[0][0],y[0][1]))
+                            else:
+                                currentContour.append((y[0],y[1]))
 
-            name = str(i[0])
-            area = round(cv2.contourArea(self.pointsToContour(currentContour)[0]), 3)
-            length = round(cv2.arcLength(self.pointsToContour(currentContour)[0], True), 3)
+                        area = round(cv2.contourArea(self.pointsToContour(currentContour)[0]), 3)
 
-            if conversion != 0:
-                length = round(length/float(conversion), 3)
-                area = round(area/(float(conversion)**2), 3)
+                        if conversion != 0:
+                            area = round(area/(float(conversion)**2), 3)
 
-            worksheet.write(0, col, (name + " a"))
-            worksheet.write(1, col, area)
+                        stentArea += area
 
-            col += 1
+                worksheet.write(0, col, ("Stents" + " a"))
+                worksheet.write(1, col, stentArea)
+                finalComps.update({"Stents" : stentArea})
 
-            worksheet.write(0, col, (name + " p"))
-            worksheet.write(1, col, length)
+                col += 1
 
-            col += 1
+            if i[1] == "Saved":
+                currentContour = []
+                for x in i[2][0].tolist():
+                    if any(isinstance(inst, list) for inst in x):
+                        currentContour.append((x[0][0],x[0][1]))
+                    else:
+                        currentContour.append((x[0],x[1]))
+
+                name = str(i[0])
+                area = round(cv2.contourArea(self.pointsToContour(currentContour)[0]), 3)
+                length = round(cv2.arcLength(self.pointsToContour(currentContour)[0], True), 3)
+
+                if conversion != 0:
+                    length = round(length/float(conversion), 3)
+                    area = round(area/(float(conversion)**2), 3)
+
+                worksheet.write(0, col, (name + " a"))
+                worksheet.write(1, col, area)
+                finalComps.update({name : (area, length)})
+
+                col += 1
+
+                worksheet.write(0, col, (name + " p"))
+                worksheet.write(1, col, length)
+
+                col += 1
+
+        #print(finalComps)
 
         # somewhat hard coded vales
+        worksheet.write(0, col, ("Lumen a Ca"))
+        lumenAreaCa = ((finalComps.get("Lumen")[1])**2)/12.5664
+        worksheet.write(1, col, str(lumenAreaCa))
+
+        col += 1
+
+        worksheet.write(0, col, ("Media a Ca"))
+        mediaAreaCa = ((finalComps.get("Media")[1])**2)/12.5664
+        worksheet.write(1, col, str(mediaAreaCa))
+
+        col += 1
+
+        worksheet.write(0, col, ("Neointima a Ca"))
+        neoAreaCa = ((finalComps.get("Neointima")[1])**2)/12.5664
+        worksheet.write(1, col, str(neoAreaCa))
+
+        col += 1
+
         worksheet.write(0, col, ("% Stenosis"))
-        worksheet.write(1, col, "=((C2-G2-A2)/C2)*100")
+        stenosis = ((finalComps.get("Neointima")[0] - finalComps.get("Stents") - finalComps.get("Lumen")[0])/(finalComps.get("Neointima")[0]))*100
+        worksheet.write(1, col, str(stenosis))
+
+        col += 1
+
+        worksheet.write(0, col, ("% Stenosis Ca"))
+        stenosisAreaCa = ((neoAreaCa - finalComps.get("Stents") - lumenAreaCa)/neoAreaCa)*100
+        worksheet.write(1, col, str(stenosisAreaCa))
 
         col += 1
 
         worksheet.write(0, col, ("N/M"))
-        worksheet.write(1, col, "=(C2-G2-A2)/(E2-C2)")
+        nm = (finalComps.get("Neointima")[0] - finalComps.get("Stents") - finalComps.get("Lumen")[0])/(finalComps.get("Media")[0] - finalComps.get("Neointima")[0])
+        worksheet.write(1, col, str(nm))
 
         col += 1
 
@@ -621,6 +751,22 @@ class Segmentation(Frame):
 
         btnSegment = Button(popup, text="Start CNN", command = lambda:[self.segment()])
         btnSegment.grid(row=1, column=1, padx=5, pady=10, sticky=E+W+S+N)
+
+        popup.mainloop()
+
+    def multiSelect(self):
+        self.pack(fill=BOTH, expand=True)
+        popup = tk.Toplevel()
+        popup.wm_title("Continue?")
+
+        exportLabel = tk.Label(popup, text="Continue Adding or Save?", font=("Helvetica 12"))
+        exportLabel.grid(row=0, column=0, columnspan=2, padx=20, pady=10, sticky=E+W+S+N)
+
+        btnContinue = Button(popup, text="Continue", command = lambda:[self.tune()])
+        btnContinue.grid(row=1, column=0, padx=5, pady=10, sticky=E+W+S+N)
+
+        btnSave = Button(popup, text="Save", command = lambda:[self.segment()])
+        btnSave.grid(row=1, column=1, padx=5, pady=10, sticky=E+W+S+N)
 
         popup.mainloop()
 
