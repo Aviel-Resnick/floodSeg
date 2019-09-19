@@ -604,8 +604,113 @@ class Segmentation(Frame):
         col += 1
 
         workbook.close()
-    
+
     def manualContour(self, tree):
+        global pathToImg, pointCount, points, finalComps
+
+        points.clear()
+
+        def preErase(event):
+            global pointCount
+            x = event.x
+            y = event.y
+
+            closestPoint = None
+            shortestDist = 9999999999999
+            for point in points:
+                dist = self.getDist((x,y), point)
+                if dist < shortestDist:
+                    shortestDist = dist
+                    closestPoint = point
+            
+            print(closestPoint)
+            points.remove(closestPoint)
+            self.refreshCanvas(canvas)
+
+            #points.append((x, y))
+            #pointCount += 1
+            
+            #self.paint(x, y, canvas)
+
+        def prePaint(event):
+            global pointCount
+            x = event.x 
+            y = event.y
+
+            points.append((x, y))
+            pointCount += 1
+            
+            self.paint(x, y, canvas)
+
+        def undo(event):
+            global pointCount, points 
+            
+            if len(points) > 0:
+                print("undoing...")
+
+                points.pop()
+                pointCount -= 1
+
+                print(points)
+
+                self.refreshCanvas(canvas)
+            
+            else:
+                print("Cannot undo, no points on canvas.")
+
+        img = ImageTk.PhotoImage(Image.open(pathToImg))
+        self.pack(fill=BOTH, expand=True)
+        manCont = tk.Toplevel()
+        manCont.wm_title("Manual Contour")
+
+        canvas = tkinter.Canvas(manCont, width=img.width(), height=img.height())
+        canvas.grid(row=0, column=0, rowspan = 5, sticky=N+S+E+W)
+
+        canvas.create_image(0, 0, image=img, anchor="nw")
+
+        # mouseclick events
+        canvas.bind("<Button 1>", prePaint)
+        canvas.bind("<Button 3>", undo)
+
+        def eraseMode():
+            canvas.bind("<Button 1>", preErase)
+
+        def addMode():
+            canvas.bind("<Button 1>", prePaint)
+
+        add = tk.Button(manCont, text="Add Mode", command = lambda:[addMode()])
+        add.grid(row=0, column=1, padx=10, pady=10, sticky=E+W+S+N)
+
+        erase = tk.Button(manCont, text="Erase Mode", command = lambda:[eraseMode()])
+        erase.grid(row=1, column=1, padx=10, pady=10, sticky=E+W+S+N)
+        
+        clearContour = tk.Button(manCont, text="Clear Points", command = lambda:[self.clearPoints(canvas)])
+        clearContour.grid(row=2, column=1, padx=10, pady=10, sticky=E+W+S+N)
+
+        complete = tk.Button(manCont, text="Complete Contour", command = lambda:[self.completeContour(self.orderPoints(points))])
+        complete.grid(row=3, column=1, padx=10, pady=10, sticky=E+W+S+N)
+
+        saveContour = tk.Button(manCont, text="Save Contour", command = lambda:[self.saveContour(tree, self.pointsToContour(self.orderPoints(points))), manCont.destroy()])
+        saveContour.grid(row=4, column=1, padx=10, pady=10, sticky=E+W+S+N)
+
+        selected = tree.focus()
+        currentComponent = tree.item(selected)
+        componentName = currentComponent["text"]
+
+        compParent = componentName.split(" ")[0]
+        if len(componentName.split(" ")) > 1:
+            compId = componentName.split(" ")[1]
+
+        if compParent in finalComps:
+            if len(componentName.split(" ")) > 1:
+                contour = (finalComps[compParent])[int(compId)]
+                for i in contour[0]:
+                    points.append((i.tolist()[0][0], i.tolist()[0][1]))
+                    self.paint(i.tolist()[0][0], i.tolist()[0][1], canvas)
+
+        manCont.mainloop()
+    
+    def manualContourOld(self, tree):
         global pathToImg, pointCount, points, componentList
 
         def preErase(event):
