@@ -40,7 +40,7 @@ pointCount = 0
 conversion = 0
 componentList = [["Lumen", "Empty", None], ["Neointima", "Empty", None], ["Media", "Empty", None], ["Stents", "Empty", None], ["Thickness", "Empty", None]]
 stentComponents = [["Stent 1", "Empty", None], ["Stent 2", "Empty", None], ["Stent 3", "Empty", None], ["Stent 4", "Empty", None], ["Stent 5", "Empty", None], ["Stent 6", "Empty", None], ["Stent 7", "Empty", None], ["Stent 8", "Empty", None], ["Stent 9", "Empty", None], ["Stent 10", "Empty", None]]
-finalComps = {}
+finalComps = {"Lumen" : [], "Neointima" : [], "Media" : [], "Stents" : [], "Thickness" : []}
 currentName = ""
 
 '''
@@ -224,7 +224,7 @@ class Segmentation(Frame):
 
             exteriorContour = None
             largestArea = 0
-
+            
             for i in returnedContours:
                 currentPoints = []
                 for x in i:
@@ -244,6 +244,16 @@ class Segmentation(Frame):
             self.saveContour(tree, self.pointsToContour(exteriorContour))
 
     def refreshTree(self, tree):
+        global finalComps
+
+        tree.delete(*tree.get_children()) # kill all the children
+
+        for i, comp in enumerate(finalComps):
+            head = tree.insert("", i, text=str(comp))
+            for x, subComp in enumerate(finalComps[comp]):
+                tree.insert(head, x, text=(str(comp) + " " + str(x)), values="Saved")
+
+    def refreshTreeOld(self, tree):
         global componentList, stentComponents
 
         tree.delete(*tree.get_children()) # kill all the children
@@ -389,20 +399,33 @@ class Segmentation(Frame):
         self.refreshTree(tree)
     
     def viewContour(self, tree):
-        global componentList, stentComponents, pathToImg, finalComps
+        global pathToImg, finalComps
 
         selected = tree.focus()
         currentComponent = tree.item(selected)
         componentName = currentComponent["text"]
 
-        if componentName in finalComps:
-            img = cv2.imread(pathToImg)
-            for i in finalComps[componentName]:
-                cv2.drawContours(img, i, 0, (0,0,255), 2)
+        compParent = componentName.split(" ")[0]
+        if len(componentName.split(" ")) > 1:
+            compId = componentName.split(" ")[1]
 
-            cv2.imshow("Viewing Contour", img)
-            cv2.waitKey(0)
-            cv2.destroyAllWindows()
+        if compParent in finalComps:
+            if len(componentName.split(" ")) == 1:
+                img = cv2.imread(pathToImg)
+                for i in finalComps[compParent]:
+                    cv2.drawContours(img, i, 0, (0,0,255), 2)
+
+                cv2.imshow("Viewing Contour", img)
+                cv2.waitKey(0)
+                cv2.destroyAllWindows()
+            else:
+                img = cv2.imread(pathToImg)
+                contour = (finalComps[compParent])[int(compId)]
+                cv2.drawContours(img, contour, 0, (0,0,255), 2)
+
+                cv2.imshow("Viewing Contour", img)
+                cv2.waitKey(0)
+                cv2.destroyAllWindows()
 
     def viewContourOld(self, tree):
         global componentList, stentComponents, pathToImg
@@ -751,22 +774,6 @@ class Segmentation(Frame):
 
         btnSegment = Button(popup, text="Start CNN", command = lambda:[self.segment()])
         btnSegment.grid(row=1, column=1, padx=5, pady=10, sticky=E+W+S+N)
-
-        popup.mainloop()
-
-    def multiSelect(self):
-        self.pack(fill=BOTH, expand=True)
-        popup = tk.Toplevel()
-        popup.wm_title("Continue?")
-
-        exportLabel = tk.Label(popup, text="Continue Adding or Save?", font=("Helvetica 12"))
-        exportLabel.grid(row=0, column=0, columnspan=2, padx=20, pady=10, sticky=E+W+S+N)
-
-        btnContinue = Button(popup, text="Continue", command = lambda:[self.tune()])
-        btnContinue.grid(row=1, column=0, padx=5, pady=10, sticky=E+W+S+N)
-
-        btnSave = Button(popup, text="Save", command = lambda:[self.segment()])
-        btnSave.grid(row=1, column=1, padx=5, pady=10, sticky=E+W+S+N)
 
         popup.mainloop()
 

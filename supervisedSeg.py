@@ -119,7 +119,10 @@ class SelectionWindow:
                 print("Q Pressed; Stopping")
                 #print(compContours)
                 compContours.clear()
-                return((False, self._contours))
+                if self._contours and hasattr(SelectionWindow, "_contours"):
+                    return((False, self._contours))
+                else:
+                    return(False, self._contours)
                 break
             elif k == ord('a'):
                 #self._close()
