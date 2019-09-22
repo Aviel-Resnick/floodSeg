@@ -68,7 +68,7 @@ class Segmentation(Frame):
         self.initUI()
 
     def selectImage(self):
-        global pathToImg, img
+        global pathToImg, img, finalComps
         
         pathToImg = tkinter.filedialog.askopenfilename(filetypes=[("Image File",'.jpg')])
         img = Image.open(pathToImg)
@@ -95,9 +95,12 @@ class Segmentation(Frame):
 
         self.adjust(1.0, 1.0, 1.0)
 
+        # deprecated
         for i in componentList:
             i[1] = "Empty"
             i[2] = None
+
+        finalComps = {"Lumen" : [], "Neointima" : [], "Media" : [], "Stents" : [], "Thickness" : []}
 
         self.updateImage(photoImg)
         
@@ -356,45 +359,27 @@ class Segmentation(Frame):
         currentComponent = tree.item(selected)
         componentName = currentComponent["text"]
         if componentName != "":
-            currentName = componentName
+            print(componentName)
+            currentName = componentName.split(" ")[0]
+            if len(componentName.split(" ")) > 1:
+                currentId = int(componentName.split(" ")[1])
+            else:
+                currentId = -1
+        else:
+            currentId = -1
 
-        print("Saving", currentName)
+        print("Saving", componentName)
 
         if currentName in finalComps:
             print("ALREADY EXISTS")
-            finalComps[currentName].append(contour)
+            #finalComps[currentName].append(contour) # this just adds it on the end, we want to add it to a particular spot (ID)
+            if currentId != -1:
+                finalComps[currentName][currentId] = contour
+            else:
+                finalComps[currentName].append(contour)
 
         else:
             finalComps.update({currentName : [contour]})
-
-        ####print(finalComps)
-
-        '''
-
-        if componentName.split()[0] == "Stent":
-            for x in stentComponents:
-                if x[0] == componentName:
-                    if contour != []:
-                        x[1] = "Saved"
-                        x[2] = contour
-                        points.clear()
-                    else:
-                        x[1] = "Empty"
-                        x[2] = contour
-                        points.clear()
-        else:
-            for i in componentList:
-                if i[0] == componentName:
-                    if contour != [] or contour != [[]] or contour != None:
-                        i[1] = "Saved"
-                        i[2] = contour
-                        points.clear()
-                    else:
-                        i[1] = "Empty"
-                        i[2] = contour
-                        points.clear()
-
-        '''
 
         self.refreshTree(tree)
     
@@ -427,40 +412,6 @@ class Segmentation(Frame):
                 cv2.waitKey(0)
                 cv2.destroyAllWindows()
 
-    def viewContourOld(self, tree):
-        global componentList, stentComponents, pathToImg
-
-        selected = tree.focus()
-        currentComponent = tree.item(selected)
-        componentName = currentComponent["text"]
-
-        if componentName.split()[0] == "Stent":
-            for x in stentComponents:
-                if x[0] == componentName and x[1] == "Saved":
-                    img = cv2.imread(pathToImg)
-                    cv2.drawContours(img, x[2], 0, (0,0,255), 2)
-
-                    cv2.imshow("Viewing Contour", img)
-                    cv2.waitKey(0)
-                    cv2.destroyAllWindows()
-        elif componentName == "Stents":
-            img = cv2.imread(pathToImg)
-            for x in stentComponents:
-                if x[1] == "Saved":
-                    cv2.drawContours(img, x[2], 0, (0,0,255), 2)
-            cv2.imshow("Viewing Contour", img)
-            cv2.waitKey(0)
-            cv2.destroyAllWindows()
-        else:
-            for i in componentList:
-                if i[0] == componentName and i[1] == "Saved":
-                    img = cv2.imread(pathToImg)
-                    cv2.drawContours(img, i[2], 0, (0,0,255), 2)
-
-                    cv2.imshow("Viewing Contour", img)
-                    cv2.waitKey(0)
-                    cv2.destroyAllWindows()
-    
     def textProcess(self):
         global componentList
 
