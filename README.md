@@ -1,2 +1,2 @@
 # arterialSegmentation
-Image segmentation applied to extracting and computing critical information from images from coronary arteries
+Automated morphometry directed at histologically stained, stent-implanted arteriers.
