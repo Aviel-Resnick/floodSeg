@@ -291,19 +291,20 @@ class Segmentation(Frame):
             self.paint(point[0], point[1], canvas)
 
     def addComponent(self):
-        global componentList
+        global finalComps
         inputDialog = tkinter.simpledialog.askstring("Add new component", "Component Name:")
-        component = [inputDialog, "Empty", None]
-        componentList.append(component)
+        finalComps.update({inputDialog : []})
 
     def removeComponent(self, tree):
-        global componentList
-        component = tree.selection()[0]
-        print(component)
-        tree.delete(component)
+        global finalComps
+        selected = tree.focus()
+        currentComponent = tree.item(selected)
+        componentName = currentComponent["text"]
 
-        #componentList.pop(int(component[-1])-1)
-        #self.refreshTree(tree)
+        print(finalComps)
+        print(componentName)
+
+        del finalComps[componentName]
 
     def getDist(self, pointA, pointB):
         x1 = pointA[0]
@@ -794,7 +795,7 @@ class Segmentation(Frame):
         add = tk.Button(popup, text="Add", command = lambda:[self.addComponent(), self.refreshTree(tree)])
         add.grid(row=3, column=0, padx=10, pady=10, sticky=E+W+S+N)
 
-        delete = tk.Button(popup, text="Remove", command = lambda:[self.removeComponent(tree)])
+        delete = tk.Button(popup, text="Remove", command = lambda:[self.removeComponent(tree), self.refreshTree(tree)])
         delete.grid(row=3, column=1, padx=10, pady=10, sticky=E+W+S+N)
 
         flood = tk.Button(popup, text="Supervised", command = lambda:[self.floodFill(tree)])
