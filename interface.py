@@ -41,6 +41,7 @@ conversion = 0
 componentList = [["Lumen", "Empty", None], ["Neointima", "Empty", None], ["Media", "Empty", None], ["Stents", "Empty", None], ["Thickness", "Empty", None]]
 stentComponents = [["Stent 1", "Empty", None], ["Stent 2", "Empty", None], ["Stent 3", "Empty", None], ["Stent 4", "Empty", None], ["Stent 5", "Empty", None], ["Stent 6", "Empty", None], ["Stent 7", "Empty", None], ["Stent 8", "Empty", None], ["Stent 9", "Empty", None], ["Stent 10", "Empty", None]]
 finalComps = {"Lumen" : [], "Neointima" : [], "Media" : [], "Stents" : [], "Thickness" : []}
+finalVals = {}
 currentName = ""
 
 '''
@@ -304,7 +305,13 @@ class Segmentation(Frame):
         print(finalComps)
         print(componentName)
 
-        del finalComps[componentName]
+        try: 
+            del finalComps[componentName]
+        except:
+            parent = componentName.split(" ")
+            index = parent.pop()
+            parent = "".join(parent)
+            del finalComps[parent][int(index)]
 
     def getDist(self, pointA, pointB):
         x1 = pointA[0]
@@ -456,6 +463,27 @@ class Segmentation(Frame):
         outputFile.close()
 
     def excelOutput(self, file):
+        global finalComps
+
+        workbook = xlsxwriter.Workbook(str(file) + ".xlsx")
+        worksheet = workbook.add_worksheet()
+
+        row = 0
+        col = 0
+
+        for i in finalComps:
+            compArea = 0
+            for x in finalComps[i]:
+                compArea += cv2.contourArea(self.pointsToContour(x[0])[0])
+
+            if conversion != 0:
+                compArea = round(compArea/(float(conversion)**2), 3)
+
+            finalVals.update({i : (compArea)}) #TODO include length
+
+        print(finalVals)
+
+    def excelOutputOld(self, file):
         global componentList, stentComponents, finalComps
 
         workbook = xlsxwriter.Workbook(str(file) + ".xlsx")
