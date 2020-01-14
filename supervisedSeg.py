@@ -66,10 +66,10 @@ class SelectionWindow:
         self._selection = self._image.copy()
         
         # FOR PRODUCTION
-        #self._contours, _ = cv2.findContours(self._mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+        self._contours, _ = cv2.findContours(self._mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
         
         # FOR TESTING
-        _, self._contours, _ = cv2.findContours(self._mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+        #_, self._contours, _ = cv2.findContours(self._mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
 
         #print(self._contours)
         cv2.drawContours(self._selection, self._contours, -1, color=(0, 0, 255), thickness=2)
@@ -116,7 +116,7 @@ class SelectionWindow:
             # q, esc, or space close the window
             if k == ord('q') or k == 27 or k == 32:
                 self._close()
-                print("Q Pressed; Stopping")
+                print("Finish Pressed; Stopping")
                 #print(compContours)
                 compContours.clear()
                 if self._contours and hasattr(SelectionWindow, "_contours"):
@@ -138,8 +138,7 @@ class SelectionWindow:
 
     @property
     def applied_mask(self):
-        self._applied_mask = cv2.bitwise_and(
-            self._image, self._image, mask=self._mask)
+        self._applied_mask = cv2.bitwise_and(self._image, self._image, mask=self._mask)
         return self._applied_mask
 
     @property

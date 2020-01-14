@@ -17,11 +17,12 @@ from os import path
 import webbrowser
 ### import unsupervisedSeg
 from supervisedSeg import SelectionWindow
+import ConcaveHull
 import cv2
 import numpy as np
 from math import sqrt
 import xlsxwriter
-from shapely.geometry import Polygon, LineString
+#from shapely.geometry import Polygon, LineString
 import math
 import matplotlib.pyplot as plt
 
@@ -52,7 +53,6 @@ Known bugs:
 
 To Do:
     Excel Output
-    Additive (Stent) Selection
     Comment sections
     break Segmentation up into multiple classes
     Find alternative to globals in interface
@@ -242,7 +242,7 @@ class Segmentation(Frame):
                 
                 if(area > largestArea):
                     largestArea = area
-                    exteriorContour = self.pointsToContour(hull)[0]
+                    exteriorContour = self.pointsToContour(hull)[0] # should be hull
 
             #self.completeContour(exteriorContour)
             self.saveContour(tree, self.pointsToContour(exteriorContour))
@@ -256,19 +256,6 @@ class Segmentation(Frame):
             head = tree.insert("", i, text=str(comp))
             for x, subComp in enumerate(finalComps[comp]):
                 tree.insert(head, x, text=(str(comp) + " " + str(x)), values="Saved")
-
-    def refreshTreeOld(self, tree):
-        global componentList, stentComponents
-
-        tree.delete(*tree.get_children()) # kill all the children
-        for i in range(0, len(componentList)):
-            # Custom for stents (since there are 1-10 of them)
-            if componentList[i][0] == "Stents":
-                tree.insert("", i, "Stents", text=componentList[i][0])
-                for i in range(0, len(stentComponents)):
-                    tree.insert("Stents", i, text=stentComponents[i][0], values=stentComponents[i][1])
-            else:
-                tree.insert("", i, text=componentList[i][0], values=componentList[i][1])
 
     def clearPoints(self, canvas):
         global points
@@ -321,11 +308,21 @@ class Segmentation(Frame):
 
         return(sqrt((x2 - x1)**2 + (y2 - y1)**2))
 
+    def trimPoints(self, points):
+        new = []
+
+        for i in points:
+            if not new or self.getDist(i, new[-1]) >= 1:
+                new.append(i)
+        return new
+
     def orderPoints(self, points):
         global componentList
 
         newPoints = []
         oldPoints = points.copy()
+
+        oldPoints = self.trimPoints(oldPoints)
 
         if len(oldPoints) > 0:
             newPoints.append(oldPoints.pop())
@@ -336,6 +333,7 @@ class Segmentation(Frame):
             smallestDist = 999999999999 # lmao praying the distance between two points isn't over a trillion
             for checkPoint in oldPoints:
                 dist = self.getDist(currentPoint, checkPoint)
+                
                 if dist < smallestDist:
                     nextPoint = checkPoint
                     smallestDist = dist
@@ -344,6 +342,19 @@ class Segmentation(Frame):
             oldPoints.remove(nextPoint)
 
         return newPoints
+        '''
+
+        testPoints = np.array([[10,  9], [ 9, 18], [16, 13], [11, 15], [12, 14], [18, 12],
+                   [ 2, 14], [ 6, 18], [ 9,  9], [10,  8], [ 6, 17], [ 5,  3],
+                   [13, 19], [ 3, 18], [ 8, 17], [ 9,  7], [ 3,  0], [13, 18],
+                   [15,  4], [13, 16]])
+
+        fooBar = np.array(points)
+
+        orderedHull = ConcaveHull.concaveHull(fooBar,5)
+
+        return(orderedHull)
+        '''
 
     def completeContour(self, points):
         global pathToImg
@@ -473,15 +484,68 @@ class Segmentation(Frame):
 
         for i in finalComps:
             compArea = 0
+            compLength = 0
             for x in finalComps[i]:
                 compArea += cv2.contourArea(self.pointsToContour(x[0])[0])
+                compLength += cv2.arcLength(self.pointsToContour(x[0])[0], True)
 
             if conversion != 0:
                 compArea = round(compArea/(float(conversion)**2), 3)
+                compLength = round(compLength/(float(conversion)), 3)
 
-            finalVals.update({i : (compArea)}) #TODO include length
+            finalVals.update({i : (compArea, compLength)})
 
         print(finalVals)
+        
+        for i in finalVals:
+            worksheet.write(0, col, (i + " a"))
+            worksheet.write(1, col, finalVals.get(i)[0])
+
+            col += 1
+
+            worksheet.write(0, col, (i + " p"))
+            worksheet.write(1, col, finalVals.get(i)[1])
+
+            col += 1
+
+        # Custom Data Points
+        worksheet.write(0, col, ("Lumen a Ca"))
+        lumenAreaCa = ((finalVals.get("Lumen")[1])**2)/12.5664
+        worksheet.write(1, col, str(lumenAreaCa))
+
+        col += 1
+
+        worksheet.write(0, col, ("Media a Ca"))
+        mediaAreaCa = ((finalVals.get("Media")[1])**2)/12.5664
+        worksheet.write(1, col, str(mediaAreaCa))
+
+        col += 1
+
+        worksheet.write(0, col, ("Neointima a Ca"))
+        neoAreaCa = ((finalVals.get("Neointima")[1])**2)/12.5664
+        worksheet.write(1, col, str(neoAreaCa))
+
+        col += 1
+
+        worksheet.write(0, col, ("% Stenosis"))
+        stenosis = ((finalVals.get("Neointima")[0] - finalVals.get("Stents")[0] - finalVals.get("Lumen")[0])/(finalVals.get("Neointima")[0]))*100
+        worksheet.write(1, col, str(stenosis))
+
+        col += 1
+
+        worksheet.write(0, col, ("% Stenosis Ca"))
+        stenosisAreaCa = ((neoAreaCa - finalVals.get("Stents")[0] - lumenAreaCa)/neoAreaCa)*100
+        worksheet.write(1, col, str(stenosisAreaCa))
+
+        col += 1
+
+        worksheet.write(0, col, ("N/M"))
+        nm = (finalVals.get("Neointima")[0] - finalVals.get("Stents")[0] - finalVals.get("Lumen")[0])/(finalVals.get("Media")[0] - finalVals.get("Neointima")[0])
+        worksheet.write(1, col, str(nm))
+
+        col += 1
+        
+        workbook.close()
 
     def excelOutputOld(self, file):
         global componentList, stentComponents, finalComps
@@ -690,8 +754,7 @@ class Segmentation(Frame):
 
         manCont.mainloop()
     
-    def manualContourOld(self, tree):
-        global pathToImg, pointCount, points, componentList
+        #global pathToImg, pointCount, points, componentList
 
         def preErase(event):
             global pointCount
@@ -826,7 +889,7 @@ class Segmentation(Frame):
         delete = tk.Button(popup, text="Remove", command = lambda:[self.removeComponent(tree), self.refreshTree(tree)])
         delete.grid(row=3, column=1, padx=10, pady=10, sticky=E+W+S+N)
 
-        flood = tk.Button(popup, text="Supervised", command = lambda:[self.floodFill(tree)])
+        flood = tk.Button(popup, text="Flood Fill", command = lambda:[self.floodFill(tree)])
         flood.grid(row=3, column=2, padx=10, pady=10, sticky=E+W+S+N)
         
         manual = tk.Button(popup, text="Manual Contour", command = lambda:[self.manualContour(tree)])
