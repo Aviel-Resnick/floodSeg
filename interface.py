@@ -17,7 +17,7 @@ from os import path
 import webbrowser
 ### import unsupervisedSeg
 from supervisedSeg import SelectionWindow
-import ConcaveHull
+#import ConcaveHull
 import cv2
 import numpy as np
 from math import sqrt
@@ -47,13 +47,10 @@ currentName = ""
 
 '''
 Known bugs:
+    You can only manually correct once --> the points are [] instead of the expected [][]
     Could crash if a file isn't selected, or no new component name is given
-    Since I am not removing the "deleted" item from componentList, its returns at the next refresh
-    Adding components window might be on the wrong layer
 
 To Do:
-    Excel Output
-    Comment sections
     break Segmentation up into multiple classes
     Find alternative to globals in interface
         Lambda is the answer
@@ -959,6 +956,7 @@ def main():
     #root.geometry("")
     app = Segmentation()
     root.mainloop()
+
 
 if __name__ == '__main__':
     main()
