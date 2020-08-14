@@ -23,12 +23,13 @@ import cv2
 import numpy
 
 class MainGUI(Frame):
-    conversion = 0
-    frameReference=0
-    framePreview=0
-    tree=0
-    img=0
-    openCV_Image=0
+    conversion=None
+    frameReference=None
+    framePreview=None
+    tree=None
+    img=None
+    openCV_Image=None
+    pathToImg=None
 
     def __init__(self):
         super().__init__()
@@ -83,7 +84,7 @@ class MainGUI(Frame):
         manual = tk.Button(frameComponentTable, text="Manual Contour", width = 20, command = lambda:[print("Manual Contour")])
         manual.grid(row=3, column=1, padx=10, pady=10)
 
-        view = tk.Button(frameComponentTable, text="Toggle Preview", width = 20, command = lambda:[logic.togglePreview(MainGUI.tree)])
+        view = tk.Button(frameComponentTable, text="Toggle Preview", width = 20, command = lambda:[MainGUI.updatePreviewImage(logic.togglePreview(MainGUI.tree, MainGUI.pathToImg), "BGR")])
         view.grid(row=4, column=1, padx=10, pady=10)
 
         # DATA OUTPUT FRAME
@@ -98,8 +99,8 @@ class MainGUI(Frame):
         logic.presets(MainGUI.tree, "Arterial Segmentation")
 
     def selectImage():
-        pathToImg = tkinter.filedialog.askopenfilename(filetypes=[("Image File",'.jpg')])
-        MainGUI.img = Image.open(pathToImg)
+        MainGUI.pathToImg = tkinter.filedialog.askopenfilename(filetypes=[("Image File",'.jpg')])
+        MainGUI.img = Image.open(MainGUI.pathToImg)
         photoImg = ImageTk.PhotoImage(MainGUI.img)
 
         MainGUI.openCV_Image = numpy.array(MainGUI.img)
@@ -108,7 +109,7 @@ class MainGUI(Frame):
         #openCV_Image = openCV_Image[:, :, ::-1].copy() 
         
         MainGUI.updateReferenceImage(photoImg)
-        MainGUI.updatePreviewImage(MainGUI.openCV_Image)
+        MainGUI.updatePreviewImage(MainGUI.openCV_Image, "RGB")
         print(MainGUI.conversion)
 
     def updateReferenceImage(image):
@@ -116,7 +117,7 @@ class MainGUI(Frame):
         panelRef.image = image
         panelRef.grid(row=0, column=0)
 
-    def updatePreviewImage(cvImage):
+    def updatePreviewImage(cvImage, color):
         '''
         panelPreview = tk.Label(MainGUI.framePreview, image = image)
         panelPreview.image = image
@@ -126,6 +127,11 @@ class MainGUI(Frame):
         panelPreview.grid(row=0, column=1)
 
         img = Image.fromarray(cvImage)
+
+        if(color == "BGR"):
+            b, g, r = img.split()
+            img = Image.merge("RGB", (r, g, b))
+
         tkImg = ImageTk.PhotoImage(image=img)
         panelPreview.tkImg = tkImg
         panelPreview.configure(image=tkImg)

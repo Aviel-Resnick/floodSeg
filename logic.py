@@ -165,7 +165,7 @@ def floodFill(image, tree):
         saveContour(tree, pointsToContour(exteriorContour)) # why am I ptc'ing exterior contour twice
         print("Saved Contour")
 
-def togglePreview(tree):
+def togglePreview(tree, pathToImg):
     selected = tree.focus()
     currentComponent = tree.item(selected)
     componentName = currentComponent["text"]
@@ -180,6 +180,8 @@ def togglePreview(tree):
             for i in finalComps[compParent]:
                 cv2.drawContours(img, i, 0, (0,0,255), 2)
 
+            return(img)
+
             cv2.imshow("Viewing Contour", img)
             cv2.waitKey(0)
             cv2.destroyAllWindows()
@@ -187,6 +189,8 @@ def togglePreview(tree):
             img = cv2.imread(pathToImg)
             contour = (finalComps[compParent])[int(compId)]
             cv2.drawContours(img, contour, 0, (0,0,255), 2)
+
+            return(img)
 
             cv2.imshow("Viewing Contour", img)
             cv2.waitKey(0)

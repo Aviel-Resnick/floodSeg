@@ -13,6 +13,7 @@ import ui
 
 Point = namedtuple('Point', 'x, y')
 compContours = []
+contourColor = (255, 0, 0)
 
 class SelectionWindow:
     #_displays = cycle(['selection', 'mask', 'applied mask'])
@@ -32,7 +33,7 @@ class SelectionWindow:
         self._selection = image.copy()
 
         for i in compContours:
-            cv2.drawContours(self._selection, i, -1, color=(0, 0, 255), thickness=2)
+            cv2.drawContours(self._selection, i, -1, color=contourColor, thickness=2)
 
         self._mask = 255*np.ones((self._h, self._w), dtype=np.uint8)
         self._applied_mask = image.copy()
@@ -73,9 +74,9 @@ class SelectionWindow:
         #_, self._contours, _ = cv2.findContours(self._mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
 
         #print(self._contours)
-        cv2.drawContours(self._selection, self._contours, -1, color=(0, 0, 255), thickness=2)
+        cv2.drawContours(self._selection, self._contours, -1, color=contourColor, thickness=2)
         for i in compContours:
-            cv2.drawContours(self._selection, i, -1, color=(0, 0, 255), thickness=2)
+            cv2.drawContours(self._selection, i, -1, color=contourColor, thickness=2)
 
     def _flip_displays(self):
         self._curr_display = next(self._displays)
@@ -107,10 +108,9 @@ class SelectionWindow:
 
         # display the image and wait for a keypress or trackbar change
         for i in compContours:
-            cv2.drawContours(self._image, i, -1, color=(0, 0, 255), thickness=2)
+            cv2.drawContours(self._image, i, -1, color=contourColor, thickness=2)
 
         cv2.imshow(self.name, self._image)
-        ui.MainGUI.updatePreviewImage(self._image)
 
 
         while(True):
