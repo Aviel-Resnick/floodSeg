@@ -19,12 +19,16 @@ from tkinter import Tk, Text, BOTH, W, N, E, S
 from tkinter.ttk import Frame, Button, Label, Style
 from PIL import ImageTk, Image, ImageEnhance, ImageDraw
 import logic
+import cv2
+import numpy
 
 class MainGUI(Frame):
     conversion = 0
     frameReference=0
     framePreview=0
     tree=0
+    img=0
+    openCV_Image=0
 
     def __init__(self):
         super().__init__()
@@ -70,16 +74,16 @@ class MainGUI(Frame):
         add = tk.Button(frameComponentTable, text="Add Component", width = 20, command = lambda:[logic.addComponent(MainGUI.tree)])
         add.grid(row=0, column=1, padx=10, pady=10)
 
-        delete = tk.Button(frameComponentTable, text="Remove Component", width = 20, command = lambda:[print("Removing Component")])
+        delete = tk.Button(frameComponentTable, text="Remove Component", width = 20, command = lambda:[logic.removeComponent(MainGUI.tree)])
         delete.grid(row=1, column=1, padx=10, pady=10)
 
-        flood = tk.Button(frameComponentTable, text="Assisted Contour", width = 20, command = lambda:[print("Assisted Contour")])
+        flood = tk.Button(frameComponentTable, text="Assisted Contour", width = 20, command = lambda:[logic.floodFill(MainGUI.openCV_Image, MainGUI.tree)])
         flood.grid(row=2, column=1, padx=10, pady=10)
         
         manual = tk.Button(frameComponentTable, text="Manual Contour", width = 20, command = lambda:[print("Manual Contour")])
         manual.grid(row=3, column=1, padx=10, pady=10)
 
-        view = tk.Button(frameComponentTable, text="Toggle Preview", width = 20, command = lambda:[print("Toggle Preview")])
+        view = tk.Button(frameComponentTable, text="Toggle Preview", width = 20, command = lambda:[logic.togglePreview(MainGUI.tree)])
         view.grid(row=4, column=1, padx=10, pady=10)
 
         # DATA OUTPUT FRAME
@@ -91,16 +95,20 @@ class MainGUI(Frame):
         MainGUI.conversion = tkinter.simpledialog.askstring("Calibration", "1mm = ?px")
 
     def presets():
-        print(MainGUI.tree)
         logic.presets(MainGUI.tree, "Arterial Segmentation")
 
     def selectImage():
         pathToImg = tkinter.filedialog.askopenfilename(filetypes=[("Image File",'.jpg')])
-        img = Image.open(pathToImg)
-        photoImg = ImageTk.PhotoImage(img)
+        MainGUI.img = Image.open(pathToImg)
+        photoImg = ImageTk.PhotoImage(MainGUI.img)
+
+        MainGUI.openCV_Image = numpy.array(MainGUI.img)
+
+        # Convert RGB to BGR 
+        #openCV_Image = openCV_Image[:, :, ::-1].copy() 
         
         MainGUI.updateReferenceImage(photoImg)
-        MainGUI.updatePreviewImage(photoImg)
+        MainGUI.updatePreviewImage(MainGUI.openCV_Image)
         print(MainGUI.conversion)
 
     def updateReferenceImage(image):
@@ -108,10 +116,20 @@ class MainGUI(Frame):
         panelRef.image = image
         panelRef.grid(row=0, column=0)
 
-    def updatePreviewImage(image):
+    def updatePreviewImage(cvImage):
+        '''
         panelPreview = tk.Label(MainGUI.framePreview, image = image)
         panelPreview.image = image
         panelPreview.grid(row=0, column=1)
+        '''
+        panelPreview = tk.Label(MainGUI.framePreview)
+        panelPreview.grid(row=0, column=1)
+
+        img = Image.fromarray(cvImage)
+        tkImg = ImageTk.PhotoImage(image=img)
+        panelPreview.tkImg = tkImg
+        panelPreview.configure(image=tkImg)
+
 
 def main():
     root = Tk()

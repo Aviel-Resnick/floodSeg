@@ -9,6 +9,7 @@ import cv2
 import numpy as np
 from collections import namedtuple
 from itertools import cycle
+import ui
 
 Point = namedtuple('Point', 'x, y')
 compContours = []
@@ -90,7 +91,6 @@ class SelectionWindow:
     def _update_window(self):
         if self._curr_display == 'selection':
             self._drawselection()
-            #cv2.imshow(self.name, self._selection)
             cv2.imshow(self.name, self._selection)
         elif self._curr_display == 'mask':
             cv2.imshow(self.name, self._mask)
@@ -110,6 +110,8 @@ class SelectionWindow:
             cv2.drawContours(self._image, i, -1, color=(0, 0, 255), thickness=2)
 
         cv2.imshow(self.name, self._image)
+        ui.MainGUI.updatePreviewImage(self._image)
+
 
         while(True):
             k = cv2.waitKey() & 0xFF
