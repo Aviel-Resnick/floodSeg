@@ -27,6 +27,7 @@ class MainGUI(Frame):
     frameReference=None
     framePreview=None
     tree=None
+    derivedTree=None
     img=None
     openCV_Image=None
     pathToImg=None
@@ -57,9 +58,9 @@ class MainGUI(Frame):
         # COMPONENT TABLE FRAME
 
         frameComponentTable=tk.LabelFrame(self.master, width=960, height=380, bg="#F5F5F5", bd=4, text="Component Table")
-        frameComponentTable.grid(row=1, column=0, padx=(0, 0), pady=(0,0))
+        frameComponentTable.grid(row=1, column=0, padx=(0, 0), pady=(30,0))
 
-        MainGUI.tree=ttk.Treeview(frameComponentTable)
+        MainGUI.tree=ttk.Treeview(frameComponentTable, height=12)
         frameComponentTable.grid_propagate(False)
         MainGUI.tree.grid(row=0, column=0, columnspan=1, rowspan=5, padx=10, pady=10)
 
@@ -90,7 +91,30 @@ class MainGUI(Frame):
         # DATA OUTPUT FRAME
 
         frameOutput=tk.LabelFrame(self.master, width=960, height=380, bg="#F5F5F5", bd=4, text="Data Output")
-        frameOutput.grid(row=1, column=1, padx=(0, 0), pady=(0,0))
+        frameOutput.grid(row=1, column=1, padx=(0, 0), pady=(30,0))
+
+        MainGUI.derivedTree=ttk.Treeview(frameOutput, height=9)
+        frameOutput.grid_propagate(False)
+        MainGUI.derivedTree.grid(row=0, column=0, columnspan=2, rowspan=1, padx=10, pady=10)
+
+        MainGUI.derivedTree["columns"]=("#1","#2")
+        MainGUI.derivedTree.column("#0", width=150, minwidth=150, stretch=tk.NO)
+        MainGUI.derivedTree.column("#1", width=450, minwidth=450, stretch=tk.NO)
+        MainGUI.derivedTree.column("#2", width=150, minwidth=150, stretch=tk.NO)
+
+        MainGUI.derivedTree.heading("#0",text="Component",anchor=tk.W)
+        MainGUI.derivedTree.heading("#1",text="Definition",anchor=tk.W)
+        MainGUI.derivedTree.heading("#2",text="Value", anchor=tk.W)
+
+        # scrollbar not fuctioning, but not entirely necessary
+
+        entryLine = tk.Entry(frameOutput, width=75, font=('Verdana', 12))
+        entryLine.grid(row=1, column=0, columnspan=1, rowspan=1, padx=10, pady=10)
+
+        submit = tk.Button(frameOutput, text="Submit", width = 20, command = lambda:[print("Derived Value")])
+        submit.grid(row=1, column=1, columnspan=1, rowspan=1, padx=10, pady=10)
+
+        
 
     def calibration():
         MainGUI.conversion = tkinter.simpledialog.askstring("Calibration", "1mm = ?px")
